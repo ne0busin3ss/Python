@@ -2,7 +2,7 @@ from tkinter import *
 
 class Application(Frame):
     def say_hi(self):
-        print ("Hi there, beautiful!")
+        print ("Hello Superstar!")
 
     def createWidgets(self):
         self.QUIT = Button(self)
