@@ -2,7 +2,7 @@ from tkinter import *
 
 
 def say_hi():
-    print("Hello Superstar!")
+    print("Hello Dave!")
 
 
 class Application(Frame):
