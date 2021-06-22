@@ -3,7 +3,7 @@
 num = 666
 
 # To take input from the user
-#num = int(input("Enter a number: "))
+num = int(input("Enter a number: "))
  
 # prime numbers are greater than 1
 if num > 1:
