@@ -3,8 +3,6 @@ from tkinter import *
 
 def say_hi():
     print("Hello Dave!")
-
-
 class Application(Frame):
 
     def createWidgets(self):
