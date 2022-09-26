@@ -1,6 +1,6 @@
 from tkinter import *
 def say_hi():
-    print("Dave!")
+    print ("Dave!")
 class Application(Frame):
 
     def createWidgets(self):
