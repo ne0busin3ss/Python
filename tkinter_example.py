@@ -1,6 +1,10 @@
 from tkinter import *
+
+
 def say_hi():
-    print ("Hello Super Dave! Nice Work")
+    print("Hello Super Dave! Nice Work")
+
+
 class Application(Frame):
 
     def createWidgets(self):
@@ -18,7 +22,7 @@ class Application(Frame):
     def __init__(self, master=None):
         Frame.__init__(self, master)
         self.hi_there = Button(self)
-        self.QUIT = Button(self)     
+        self.QUIT = Button(self)
         self.pack()
         self.createWidgets()
 
@@ -26,4 +30,4 @@ class Application(Frame):
 root = Tk()
 app = Application(master=root)
 app.mainloop()
-#root.destroy()
+# root.destroy()
