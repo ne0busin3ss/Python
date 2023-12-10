@@ -21,6 +21,6 @@ def countdown(n):
         n -= 1
 
 
-countdown(8)
+countdown(9)
 countdown(1000)
  
