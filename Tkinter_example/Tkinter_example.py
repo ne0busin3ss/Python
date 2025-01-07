@@ -1,7 +1,7 @@
 from tkinter import *
 
 def say_hi():
-    print("Hello Dave, nice work!")
+    print("Hello Dave, great work!")
 
 
 class Application(Frame):
