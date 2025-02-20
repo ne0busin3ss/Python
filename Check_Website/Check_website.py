@@ -13,3 +13,5 @@ def check_website_status(url):
         return False, "The request timed out. Website might be slow or down."
     except requests.RequestException as e:
         return False, f"An error occurred: {str(e)}"
+    url = "https://www.empower.com/"
+
