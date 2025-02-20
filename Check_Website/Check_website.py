@@ -2,16 +2,14 @@ import requests
 
 def check_website_status(url):
     try:
-        response = requests.get(url)
+        # Set a timeout for the request
+        response = requests.get(url, timeout=10)
         # A status code of 200 means the website is up.
         if response.status_code == 200:
             return True, "Website is up!"
         else:
             return False, f"Website is down or inaccessible. Status code: {response.status_code}"
-    except requests.ConnectionError:
-        return False, "Failed to connect. The website might be down or the URL is incorrect."
-
-# Example usage
-url = "https://www.empower.com/"     
-is_up, message = check_website_status(url)
-print(message)
+    except requests.Timeout:
+        return False, "The request timed out. Website might be slow or down."
+    except requests.RequestException as e:
+        return False, f"An error occurred: {str(e)}"
