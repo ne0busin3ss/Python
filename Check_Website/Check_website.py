@@ -12,6 +12,6 @@ def check_website_status(url):
         return False, "Failed to connect. The website might be down or the URL is incorrect."
 
 # Example usage
-url = "https://www.empower.com/"     
+url = "https://www.google.com"     
 is_up, message = check_website_status(url)
 print(message)
