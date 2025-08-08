@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Pendulum Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevent scrollbars from flashing during layout shifts */
+        }
+        .slider-container {
+            display: grid;
+            grid-template-columns: 1fr 3fr 1fr;
+            align-items: center;
+            gap: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-7xl mx-auto flex flex-col lg:flex-row items-center lg:items-start gap-8">
+        
+        <!-- Canvas Container -->
+        <div class="flex-shrink-0">
+            <h1 class="text-3xl font-bold text-center mb-4 text-white">Double Pendulum</h1>
+            <div class="bg-gray-800 rounded-lg shadow-2xl overflow-hidden border-2 border-gray-700">
+                <canvas id="pendulumCanvas" width="1024" height="1024" class="w-full max-w-md md:max-w-xl lg:max-w-2xl h-auto aspect-square"></canvas>
+            </div>
+        </div>
+
+        <!-- Controls Container -->
+        <div class="w-full lg:max-w-sm bg-gray-800 p-6 rounded-lg shadow-2xl border-2 border-gray-700 mt-12 lg:mt-0">
+            <h2 class="text-2xl font-bold mb-6 text-center text-white">Controls</h2>
+            
+            <div class="space-y-6">
+                <!-- Length 1 -->
+                <div class="slider-container">
+                    <label for="l1" class="font-medium text-gray-300">Length 1</label>
+                    <input type="range" id="l1" min="50" max="400" value="200" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    <span id="l1-value" class="font-mono text-lg text-cyan-400 text-center">200</span>
+                </div>
+
+                <!-- Mass 1 -->
+                <div class="slider-container">
+                    <label for="m1" class="font-medium text-gray-300">Mass 1</label>
+                    <input type="range" id="m1" min="5" max="50" value="20" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    <span id="m1-value" class="font-mono text-lg text-cyan-400 text-center">20</span>
+                </div>
+
+                <!-- Length 2 -->
+                <div class="slider-container">
+                    <label for="l2" class="font-medium text-gray-300">Length 2</label>
+                    <input type="range" id="l2" min="50" max="400" value="200" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    <span id="l2-value" class="font-mono text-lg text-cyan-400 text-center">200</span>
+                </div>
+
+                <!-- Mass 2 -->
+                <div class="slider-container">
+                    <label for="m2" class="font-medium text-gray-300">Mass 2</label>
+                    <input type="range" id="m2" min="5" max="50" value="20" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    <span id="m2-value" class="font-mono text-lg text-cyan-400 text-center">20</span>
+                </div>
+
+                <!-- Gravity -->
+                <div class="slider-container">
+                    <label for="g" class="font-medium text-gray-300">Gravity</label>
+                    <input type="range" id="g" min="0.1" max="5" value="1" step="0.1" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    <span id="g-value" class="font-mono text-lg text-cyan-400 text-center">1.0</span>
+                </div>
+
+                 <!-- Trail Length -->
+                <div class="slider-container">
+                    <label for="trailLength" class="font-medium text-gray-300">Trail</label>
+                    <input type="range" id="trailLength" min="0" max="2000" value="500" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                    <span id="trailLength-value" class="font-mono text-lg text-cyan-400 text-center">500</span>
+                </div>
+            </div>
+
+            <button id="resetButton" class="w-full mt-8 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 text-lg">
+                Reset Simulation
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- SETUP ---
+        const canvas = document.getElementById('pendulumCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const l1Slider = document.getElementById('l1');
+        const m1Slider = document.getElementById('m1');
+        const l2Slider = document.getElementById('l2');
+        const m2Slider = document.getElementById('m2');
+        const gSlider = document.getElementById('g');
+        const trailSlider = document.getElementById('trailLength');
+        const resetButton = document.getElementById('resetButton');
+
+        const l1Value = document.getElementById('l1-value');
+        const m1Value = document.getElementById('m1-value');
+        const l2Value = document.getElementById('l2-value');
+        const m2Value = document.getElementById('m2-value');
+        const gValue = document.getElementById('g-value');
+        const trailLengthValue = document.getElementById('trailLength-value');
+
+        // --- STATE VARIABLES ---
+        let a1, a2; // Angles
+        let a1_v = 0, a2_v = 0; // Angular velocities
+        let l1, l2; // Arm lengths
+        let m1, m2; // Bob masses
+        let g; // Gravity
+        
+        let pivotX, pivotY; // Pivot point
+        let trail = []; // Array to store trail points
+        let maxTrailLength;
+
+        // --- DETERMINISM ---
+        let seed = 42;
+        // A simple seeded pseudo-random number generator (PRNG)
+        function mulberry32(a) {
+            return function() {
+                let t = a += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+        let random;
+
+        // --- INITIALIZATION & RESET ---
+        function init() {
+            // Set pivot to center top
+            pivotX = canvas.width / 2;
+            pivotY = canvas.height / 2 - 100;
+
+            // Initialize PRNG with the seed
+            random = mulberry32(seed);
+
+            // Read values from sliders
+            l1 = +l1Slider.value;
+            m1 = +m1Slider.value;
+            l2 = +l2Slider.value;
+            m2 = +m2Slider.value;
+            g = +gSlider.value;
+            maxTrailLength = +trailSlider.value;
+
+            // Update value displays
+            l1Value.textContent = l1;
+            m1Value.textContent = m1;
+            l2Value.textContent = l2;
+            m2Value.textContent = m2;
+            gValue.textContent = g.toFixed(1);
+            trailLengthValue.textContent = maxTrailLength;
+
+            // Set deterministic initial angles using the seeded PRNG
+            a1 = Math.PI / 2 + (random() - 0.5) * 0.1;
+            a2 = Math.PI / 2 + (random() - 0.5) * 0.1;
+
+            // Reset velocities and trail
+            a1_v = 0;
+            a2_v = 0;
+            trail = [];
+        // No extra closing brace here
+
+        // --- EVENT LISTENERS (only add once) ---
+        l1Slider.addEventListener('input', (e) => { l1Value.textContent = e.target.value; });
+        m1Slider.addEventListener('input', (e) => { m1Value.textContent = e.target.value; });
+        l2Slider.addEventListener('input', (e) => { l2Value.textContent = e.target.value; });
+        m2Slider.addEventListener('input', (e) => { m2Value.textContent = e.target.value; });
+        gSlider.addEventListener('input', (e) => { gValue.textContent = parseFloat(e.target.value).toFixed(1); });
+        trailSlider.addEventListener('input', (e) => { trailLengthValue.textContent = e.target.value; });
+        resetButton.addEventListener('click', init);
+        }
+
+        // --- PHYSICS CALCULATION ---
+        function updatePhysics() {
+            // Equations of motion for the double pendulum
+            // See: https://www.myphysicslab.com/pendulum/double-pendulum-en.html
+            
+            // Angular acceleration for the first pendulum arm
+            let num1 = -g * (2 * m1 + m2) * Math.sin(a1);
+            let num2 = -m2 * g * Math.sin(a1 - 2 * a2);
+            let num3 = -2 * Math.sin(a1 - a2) * m2 * (a2_v * a2_v * l2 + a1_v * a1_v * l1 * Math.cos(a1 - a2));
+            let den1 = l1 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
+            let a1_acc = (num1 + num2 + num3) / den1;
+
+            // Angular acceleration for the second pendulum arm
+            let num4 = 2 * Math.sin(a1 - a2);
+            let num5 = (a1_v * a1_v * l1 * (m1 + m2));
+            let num6 = g * (m1 + m2) * Math.cos(a1);
+            let num7 = a2_v * a2_v * l2 * m2 * Math.cos(a1 - a2);
+            let den2 = l2 * (2 * m1 + m2 - m2 * Math.cos(2 * a1 - 2 * a2));
+            let a2_acc = (num4 * (num5 + num6 + num7)) / den2;
+
+            // Update velocities and angles using Euler integration
+            a1_v += a1_acc * 0.1; // Time step is implicitly 0.1
+            a2_v += a2_acc * 0.1;
+            a1 += a1_v * 0.1;
+            a2 += a2_v * 0.1;
+        }
+
+        // --- DRAWING ---
+        function draw() {
+            // Clear canvas with a semi-transparent background for a slight fade effect on the main pendulum
+            ctx.fillStyle = 'rgba(17, 24, 39, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate bob positions
+            const x1 = pivotX + l1 * Math.sin(a1);
+            const y1 = pivotY + l1 * Math.cos(a1);
+            const x2 = x1 + l2 * Math.sin(a2);
+            const y2 = y1 + l2 * Math.cos(a2);
+
+            // Add current position to trail
+            trail.push({ x: x2, y: y2 });
+            if (trail.length > maxTrailLength) {
+                trail.shift(); // Remove the oldest point
+            }
+
+            // Draw Trail
+            drawTrail();
+
+            // Draw Pendulum
+            drawPendulum(x1, y1, x2, y2);
+        }
+        
+        function drawTrail() {
+            if (trail.length < 2) return;
+            ctx.lineWidth = 3;
+            for (let i = 1; i < trail.length; i++) {
+                const alpha = i / trail.length; // Fade out older parts of the trail
+                const hue = (i / trail.length * 120 + 180) % 360; // Color shift from cyan to magenta
+                ctx.strokeStyle = `hsla(${hue}, 100%, 60%, ${alpha * 0.8})`;
+                ctx.beginPath();
+                ctx.moveTo(trail[i-1].x, trail[i-1].y);
+                ctx.lineTo(trail[i].x, trail[i].y);
+                ctx.stroke();
+            }
+        }
+
+        function drawPendulum(x1, y1, x2, y2) {
+            // Draw arms
+            ctx.strokeStyle = '#9ca3af'; // gray-400
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(pivotX, pivotY);
+            ctx.lineTo(x1, y1);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            
+            // Draw pivot
+            ctx.fillStyle = '#f3f4f6'; // gray-100
+            ctx.beginPath();
+            ctx.arc(pivotX, pivotY, 8, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Draw bobs
+            ctx.fillStyle = '#22d3ee'; // cyan-500
+            ctx.beginPath();
+            ctx.arc(x1, y1, m1 * 0.75, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.fillStyle = '#a5f3fc'; // cyan-200
+            ctx.beginPath();
+            ctx.arc(x2, y2, m2 * 0.75, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            updatePhysics();
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        // --- START ---
+        window.onload = () => {
+            init();
+            animate();
+        };
+        window.onresize = () => {
+            // Re-center pivot on resize if needed, though canvas resolution is fixed
+        };
+
+    </script>
+</body>
+</html>
