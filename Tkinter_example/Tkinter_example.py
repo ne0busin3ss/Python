@@ -2,7 +2,7 @@ import tkinter as tk
 
 def say_hi():
     """Prints a greeting message."""
-    print("Hello Dave, great work!")
+    print("Hello Dave, outstanding work!")
 
 class Application(tk.Frame):
     """A simple Tkinter application with two buttons."""
