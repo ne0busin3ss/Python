@@ -14,7 +14,7 @@ class Application(ttk.Frame):
 
     def say_hi(self) -> None:
         """Prints a greeting message."""
-        print("Hello Dave, outstanding work!")
+        print("Hello Dave, nice work!")
 
     def create_widgets(self) -> None:
         """Create and configure the widgets for the application."""
