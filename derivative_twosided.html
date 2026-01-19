@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Derivative Visualization: Two-Sided Limits</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #111827;
+            color: #E5E7EB;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 1.7rem;
+            margin-bottom: 5px;
+            color: #F3F4F6;
+        }
+        .subtitle {
+            text-align: center;
+            color: #9CA3AF;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+        .graph-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        canvas {
+            background: #1F2937;
+            border-radius: 8px;
+            max-width: 100%;
+        }
+        .function-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .func-btn {
+            padding: 10px 20px;
+            border: 2px solid #374151;
+            background: #1F2937;
+            color: #E5E7EB;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            transition: all 0.2s;
+        }
+        .func-btn:hover {
+            border-color: #3B82F6;
+            background: #374151;
+        }
+        .func-btn.active {
+            border-color: #3B82F6;
+            background: #3B82F6;
+            color: white;
+        }
+        .func-btn.warning {
+            border-color: #F59E0B;
+        }
+        .func-btn.warning.active {
+            background: #F59E0B;
+            border-color: #F59E0B;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            background: #1F2937;
+            border-radius: 12px;
+            padding: 25px 40px;
+            margin: 15px auto;
+            max-width: 900px;
+        }
+        .slider-group {
+            flex: 1;
+            min-width: 280px;
+            max-width: 400px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .slider-label span:first-child {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .slider-value {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+        .x-color { color: #EF4444; }
+        .x-value-box { background: rgba(239,68,68,0.2); color: #FCA5A5; }
+        .h-color { color: #F59E0B; }
+        .h-value-box { background: rgba(245,158,11,0.2); color: #FCD34D; }
+        .h-positive { color: #10B981; }
+        .h-negative { color: #EC4899; }
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        #x-slider {
+            background: linear-gradient(to right, #7F1D1D, #EF4444, #FCA5A5);
+        }
+        #x-slider::-webkit-slider-thumb { background: #EF4444; }
+        #x-slider::-moz-range-thumb { background: #EF4444; }
+        #h-slider {
+            background: linear-gradient(to right, #EC4899, #374151, #10B981);
+        }
+        #h-slider::-webkit-slider-thumb { background: #F59E0B; }
+        #h-slider::-moz-range-thumb { background: #F59E0B; }
+        .slider-marks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.75rem;
+            color: #6B7280;
+        }
+        .info-panel {
+            background: #1F2937;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px auto;
+            max-width: 900px;
+            text-align: center;
+        }
+        .info-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px 30px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.95rem;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-label { color: #9CA3AF; }
+        .info-value { font-weight: bold; }
+        .tangent-color { color: #10B981; }
+        .secant-color { color: #F59E0B; }
+        .diff-color { color: #EF4444; }
+        .two-sided-panel {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #374151;
+        }
+        .two-sided-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px 40px;
+            margin-bottom: 10px;
+        }
+        .limit-box {
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .limit-right {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid #10B981;
+        }
+        .limit-left {
+            background: rgba(236, 72, 153, 0.15);
+            border: 1px solid #EC4899;
+        }
+        .limit-title {
+            font-size: 0.8rem;
+            color: #9CA3AF;
+            margin-bottom: 5px;
+        }
+        .limit-value {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        .derivative-result {
+            margin-top: 10px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .derivative-exists {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10B981;
+            color: #10B981;
+        }
+        .derivative-not-exists {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #EF4444;
+            color: #EF4444;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 10px auto;
+            max-width: 900px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        .legend-line {
+            width: 30px;
+            height: 3px;
+            border-radius: 2px;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        .math-explanation {
+            text-align: center;
+            padding: 15px;
+            margin: 10px auto;
+            max-width: 900px;
+            color: #9CA3AF;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .math-explanation strong {
+            color: #D1D5DB;
+        }
+        .formula {
+            color: #10B981;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        }
+        .direction-indicator {
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Derivative: Two-Sided Limit</h1>
+    <p class="subtitle">The derivative exists only if both one-sided limits agree</p>
+    
+    <div class="function-selector">
+        <button class="func-btn active" data-func="x2">f(x) = x²</button>
+        <button class="func-btn" data-func="x3">f(x) = x³</button>
+        <button class="func-btn warning" data-func="abs">f(x) = |x|</button>
+        <button class="func-btn warning" data-func="cbrt">f(x) = ∛x</button>
+    </div>
+    
+    <div class="graph-container">
+        <canvas id="graph" width="800" height="500"></canvas>
+    </div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-line" style="background: #3B82F6;"></div>
+            <span>Function</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-line" style="background: #10B981;"></div>
+            <span>Tangent (if exists)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-line" style="background: #F59E0B;"></div>
+            <span>Secant line</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #EF4444;"></div>
+            <span>Point x</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #F59E0B;"></div>
+            <span>Point x + h</span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <div class="slider-group">
+            <div class="slider-label">
+                <span class="x-color">Point Position (x)</span>
+                <span id="x-display" class="slider-value x-value-box">0.00</span>
+            </div>
+            <input type="range" id="x-slider" min="-2" max="2" step="0.01" value="0">
+            <div class="slider-marks">
+                <span>-2</span><span>-1</span><span>0</span><span>1</span><span>2</span>
+            </div>
+        </div>
+        <div class="slider-group">
+            <div class="slider-label">
+                <span class="h-color">Step Size (h)</span>
+                <span id="h-display" class="slider-value h-value-box">1.00</span>
+            </div>
+            <input type="range" id="h-slider" min="-2" max="2" step="0.01" value="1">
+            <div class="slider-marks">
+                <span style="color:#EC4899">-2</span>
+                <span style="color:#EC4899">-1</span>
+                <span style="color:#6B7280">0</span>
+                <span style="color:#10B981">+1</span>
+                <span style="color:#10B981">+2</span>
+            </div>
+            <div id="direction-text" class="direction-indicator" style="text-align:center; color:#10B981;">
+                → Approaching from RIGHT (h &gt; 0)
+            </div>
+        </div>
+    </div>
+    
+    <div class="info-panel">
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Current secant slope:</span>
+                <span id="secant-slope" class="info-value secant-color">2.0000</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">|h| =</span>
+                <span id="h-abs" class="info-value" style="color:#F59E0B;">1.0000</span>
+            </div>
+        </div>
+        
+        <div class="two-sided-panel">
+            <div class="two-sided-row">
+                <div class="limit-box limit-right">
+                    <div class="limit-title">Right-hand limit (h → 0⁺)</div>
+                    <div id="limit-right" class="limit-value" style="color:#10B981;">—</div>
+                </div>
+                <div class="limit-box limit-left">
+                    <div class="limit-title">Left-hand limit (h → 0⁻)</div>
+                    <div id="limit-left" class="limit-value" style="color:#EC4899;">—</div>
+                </div>
+            </div>
+            <div id="derivative-status" class="derivative-result derivative-exists">
+                f'(0) = 0 ✓ Derivative exists
+            </div>
+        </div>
+    </div>
+    
+    <div class="math-explanation">
+        <strong>Definition:</strong> <span class="formula">f'(x) = lim<sub>h→0</sub> [f(x+h) − f(x)] / h</span> exists <strong>if and only if</strong><br>
+        <span class="formula">lim<sub>h→0⁺</sub> [f(x+h) − f(x)] / h</span> = <span class="formula">lim<sub>h→0⁻</sub> [f(x+h) − f(x)] / h</span>
+    </div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('graph');
+        const ctx = canvas.getContext('2d');
+        
+        // Current function selection
+        let currentFunc = 'x2';
+        
+        // Function definitions
+        const functions = {
+            x2: {
+                f: x => x * x,
+                fPrime: x => 2 * x,
+                name: 'f(x) = x²',
+                hasPrimeEverywhere: true
+            },
+            x3: {
+                f: x => x * x * x,
+                fPrime: x => 3 * x * x,
+                name: 'f(x) = x³',
+                hasPrimeEverywhere: true
+            },
+            abs: {
+                f: x => Math.abs(x),
+                fPrime: x => x > 0 ? 1 : (x < 0 ? -1 : null),
+                fPrimeRight: x => 1,
+                fPrimeLeft: x => -1,
+                name: 'f(x) = |x|',
+                hasPrimeEverywhere: false,
+                singularityAt: 0
+            },
+            cbrt: {
+                f: x => Math.cbrt(x),
+                fPrime: x => x !== 0 ? 1 / (3 * Math.cbrt(x * x)) : Infinity,
+                name: 'f(x) = ∛x',
+                hasPrimeEverywhere: false,
+                singularityAt: 0,
+                verticalTangent: true
+            }
+        };
+        
+        // Graph bounds
+        let xMin = -3, xMax = 3;
+        let yMin = -2, yMax = 5;
+        
+        // Padding
+        const padding = { left: 50, right: 20, top: 20, bottom: 40 };
+        
+        // Convert coords
+        function toCanvasX(x) {
+            return padding.left + (x - xMin) / (xMax - xMin) * (canvas.width - padding.left - padding.right);
+        }
+        function toCanvasY(y) {
+            return canvas.height - padding.bottom - (y - yMin) / (yMax - yMin) * (canvas.height - padding.top - padding.bottom);
+        }
+        
+        // Draw grid
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(128,128,128,0.2)';
+            ctx.lineWidth = 1;
+            
+            for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(x), toCanvasY(yMin));
+                ctx.lineTo(toCanvasX(x), toCanvasY(yMax));
+                ctx.stroke();
+            }
+            
+            for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(xMin), toCanvasY(y));
+                ctx.lineTo(toCanvasX(xMax), toCanvasY(y));
+                ctx.stroke();
+            }
+            
+            // Axes
+            ctx.strokeStyle = 'rgba(128,128,128,0.6)';
+            ctx.lineWidth = 1.5;
+            
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(xMin), toCanvasY(0));
+            ctx.lineTo(toCanvasX(xMax), toCanvasY(0));
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(0), toCanvasY(yMin));
+            ctx.lineTo(toCanvasX(0), toCanvasY(yMax));
+            ctx.stroke();
+            
+            // Labels
+            ctx.fillStyle = '#9CA3AF';
+            ctx.font = '12px system-ui';
+            ctx.textAlign = 'center';
+            
+            for (let x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+                if (x !== 0) ctx.fillText(x.toString(), toCanvasX(x), canvas.height - padding.bottom + 20);
+            }
+            
+            ctx.textAlign = 'right';
+            for (let y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+                if (y !== 0) ctx.fillText(y.toString(), padding.left - 10, toCanvasY(y) + 4);
+            }
+            
+            ctx.fillText('0', padding.left - 10, toCanvasY(0) + 4);
+        }
+        
+        // Draw curve
+        function drawCurve() {
+            const func = functions[currentFunc];
+            ctx.strokeStyle = '#3B82F6';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            let first = true;
+            for (let x = xMin; x <= xMax; x += 0.02) {
+                const y = func.f(x);
+                if (y >= yMin && y <= yMax && isFinite(y)) {
+                    if (first) {
+                        ctx.moveTo(toCanvasX(x), toCanvasY(y));
+                        first = false;
+                    } else {
+                        ctx.lineTo(toCanvasX(x), toCanvasY(y));
+                    }
+                } else {
+                    first = true;
+                }
+            }
+            ctx.stroke();
+            
+            // Function label
+            ctx.fillStyle = '#3B82F6';
+            ctx.font = 'bold 14px SF Mono, Monaco, monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(func.name, padding.left + 10, padding.top + 20);
+        }
+        
+        // Draw line
+        function drawLine(x1, y1, x2, y2, color, width, dashed = false) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.setLineDash(dashed ? [8, 4] : []);
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(x1), toCanvasY(y1));
+            ctx.lineTo(toCanvasX(x2), toCanvasY(y2));
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Draw point
+        function drawPoint(x, y, color, radius) {
+            const cx = toCanvasX(x);
+            const cy = toCanvasY(y);
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+        
+        // Draw deltas
+        function drawDeltas(px, py, sx2, sy2, h) {
+            const color = h >= 0 ? '#10B981' : '#EC4899';
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(px), toCanvasY(py));
+            ctx.lineTo(toCanvasX(sx2), toCanvasY(py));
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(sx2), toCanvasY(py));
+            ctx.lineTo(toCanvasX(sx2), toCanvasY(sy2));
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            ctx.fillStyle = color;
+            ctx.font = '11px SF Mono, Monaco, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`h = ${h >= 0 ? '+' : ''}${h.toFixed(2)}`, toCanvasX((px + sx2) / 2), toCanvasY(py) + (h >= 0 ? 15 : -8));
+        }
+        
+        // Main draw
+        function draw(px, h) {
+            const func = functions[currentFunc];
+            
+            ctx.fillStyle = '#1F2937';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawCurve();
+            
+            // Avoid h = 0
+            if (Math.abs(h) < 0.001) h = h >= 0 ? 0.001 : -0.001;
+            
+            const py = func.f(px);
+            const sx2 = px + h;
+            const sy2 = func.f(sx2);
+            const secantSlope = (sy2 - py) / h;
+            
+            // Draw tangent if derivative exists at this point
+            const slope = func.fPrime(px);
+            if (slope !== null && isFinite(slope)) {
+                const tangentX1 = px - 1.5;
+                const tangentX2 = px + 1.5;
+                const tangentY1 = py + slope * (tangentX1 - px);
+                const tangentY2 = py + slope * (tangentX2 - px);
+                drawLine(tangentX1, tangentY1, tangentX2, tangentY2, '#10B981', 2.5);
+            } else if (func.verticalTangent && px === func.singularityAt) {
+                // Vertical tangent
+                drawLine(px, yMin, px, yMax, '#10B981', 2.5);
+            }
+            
+            // Draw secant
+            const secantColor = h >= 0 ? '#10B981' : '#EC4899';
+            const secantX1 = Math.min(px, sx2) - 0.5;
+            const secantX2 = Math.max(px, sx2) + 0.5;
+            const secantY1 = py + secantSlope * (secantX1 - px);
+            const secantY2 = py + secantSlope * (secantX2 - px);
+            drawLine(secantX1, secantY1, secantX2, secantY2, secantColor, 2, true);
+            
+            // Draw deltas
+            drawDeltas(px, py, sx2, sy2, h);
+            
+            // Draw points
+            drawPoint(px, py, '#EF4444', 7);
+            drawPoint(sx2, sy2, secantColor, 5);
+            
+            return { secantSlope, slope };
+        }
+        
+        // DOM elements
+        const xSlider = document.getElementById('x-slider');
+        const hSlider = document.getElementById('h-slider');
+        const xDisplay = document.getElementById('x-display');
+        const hDisplay = document.getElementById('h-display');
+        const hAbs = document.getElementById('h-abs');
+        const secantSlopeEl = document.getElementById('secant-slope');
+        const limitRightEl = document.getElementById('limit-right');
+        const limitLeftEl = document.getElementById('limit-left');
+        const derivativeStatus = document.getElementById('derivative-status');
+        const directionText = document.getElementById('direction-text');
+        
+        function update() {
+            const px = parseFloat(xSlider.value);
+            let h = parseFloat(hSlider.value);
+            
+            // Avoid exactly 0
+            if (h === 0) h = 0.001;
+            
+            const func = functions[currentFunc];
+            
+            xDisplay.textContent = px.toFixed(2);
+            hDisplay.textContent = (h >= 0 ? '+' : '') + h.toFixed(2);
+            hDisplay.className = 'slider-value h-value-box ' + (h >= 0 ? 'h-positive' : 'h-negative');
+            hAbs.textContent = Math.abs(h).toFixed(4);
+            
+            // Direction indicator
+            if (h >= 0) {
+                directionText.innerHTML = '→ Approaching from <strong>RIGHT</strong> (h &gt; 0)';
+                directionText.style.color = '#10B981';
+            } else {
+                directionText.innerHTML = '← Approaching from <strong>LEFT</strong> (h &lt; 0)';
+                directionText.style.color = '#EC4899';
+            }
+            
+            const { secantSlope } = draw(px, h);
+            
+            secantSlopeEl.textContent = isFinite(secantSlope) ? secantSlope.toFixed(4) : '∞';
+            secantSlopeEl.style.color = h >= 0 ? '#10B981' : '#EC4899';
+            
+            // Calculate one-sided limits (using small h)
+            const epsilon = 0.0001;
+            const rightLimit = (func.f(px + epsilon) - func.f(px)) / epsilon;
+            const leftLimit = (func.f(px - epsilon) - func.f(px)) / (-epsilon);
+            
+            limitRightEl.textContent = isFinite(rightLimit) ? rightLimit.toFixed(4) : (rightLimit > 0 ? '+∞' : '-∞');
+            limitLeftEl.textContent = isFinite(leftLimit) ? leftLimit.toFixed(4) : (leftLimit > 0 ? '+∞' : '-∞');
+            
+            // Check if derivative exists
+            const limitsAgree = Math.abs(rightLimit - leftLimit) < 0.01;
+            const bothFinite = isFinite(rightLimit) && isFinite(leftLimit);
+            
+            if (bothFinite && limitsAgree) {
+                const derivative = (rightLimit + leftLimit) / 2;
+                derivativeStatus.className = 'derivative-result derivative-exists';
+                derivativeStatus.innerHTML = `f'(${px.toFixed(2)}) = ${derivative.toFixed(4)} ✓ Derivative exists`;
+            } else if (!bothFinite && Math.sign(rightLimit) === Math.sign(leftLimit)) {
+                derivativeStatus.className = 'derivative-result derivative-not-exists';
+                derivativeStatus.innerHTML = `f'(${px.toFixed(2)}) = ${rightLimit > 0 ? '+∞' : '-∞'} — Vertical tangent (derivative undefined)`;
+            } else {
+                derivativeStatus.className = 'derivative-result derivative-not-exists';
+                derivativeStatus.innerHTML = `f'(${px.toFixed(2)}) does not exist ✗ One-sided limits disagree!`;
+            }
+        }
+        
+        // Function selector
+        document.querySelectorAll('.func-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.func-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFunc = btn.dataset.func;
+                
+                // Adjust bounds for different functions
+                if (currentFunc === 'abs') {
+                    yMin = -1; yMax = 4;
+                } else if (currentFunc === 'cbrt') {
+                    yMin = -2; yMax = 2;
+                } else {
+                    yMin = -2; yMax = 5;
+                }
+                
+                update();
+            });
+        });
+        
+        xSlider.addEventListener('input', update);
+        hSlider.addEventListener('input', update);
+        
+        update();
+    </script>
+</body>
+</html>

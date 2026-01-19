@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Derivative Visualization: f(x) = x²</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #111827;
+            color: #E5E7EB;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            color: #F3F4F6;
+        }
+        .subtitle {
+            text-align: center;
+            color: #9CA3AF;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+        .graph-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        canvas {
+            background: #1F2937;
+            border-radius: 8px;
+            max-width: 100%;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            background: #1F2937;
+            border-radius: 12px;
+            padding: 25px 40px;
+            margin: 15px auto;
+            max-width: 900px;
+        }
+        .slider-group {
+            flex: 1;
+            min-width: 280px;
+            max-width: 400px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .slider-label span:first-child {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .slider-value {
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+        .x-color { color: #EF4444; }
+        .x-value-box { background: rgba(239,68,68,0.2); color: #FCA5A5; }
+        .h-color { color: #F59E0B; }
+        .h-value-box { background: rgba(245,158,11,0.2); color: #FCD34D; }
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        #x-slider {
+            background: linear-gradient(to right, #7F1D1D, #EF4444, #FCA5A5);
+        }
+        #x-slider::-webkit-slider-thumb { background: #EF4444; }
+        #x-slider::-moz-range-thumb { background: #EF4444; }
+        #h-slider {
+            background: linear-gradient(to right, #10B981, #F59E0B, #F59E0B);
+        }
+        #h-slider::-webkit-slider-thumb { background: #F59E0B; }
+        #h-slider::-moz-range-thumb { background: #F59E0B; }
+        .slider-marks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.75rem;
+            color: #6B7280;
+        }
+        .info-panel {
+            background: #1F2937;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px auto;
+            max-width: 900px;
+            text-align: center;
+        }
+        .info-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px 30px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 0.95rem;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-label { color: #9CA3AF; }
+        .info-value { font-weight: bold; }
+        .tangent-color { color: #10B981; }
+        .secant-color { color: #F59E0B; }
+        .diff-color { color: #EF4444; }
+        .convergence {
+            margin-top: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .convergence-bar {
+            width: 200px;
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            margin: 8px auto 0;
+            overflow: hidden;
+        }
+        .convergence-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.15s ease, background-color 0.15s ease;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 10px auto;
+            max-width: 900px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        .legend-line {
+            width: 30px;
+            height: 3px;
+            border-radius: 2px;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        .math-explanation {
+            text-align: center;
+            padding: 15px;
+            margin: 10px auto;
+            max-width: 900px;
+            color: #9CA3AF;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .math-explanation strong {
+            color: #D1D5DB;
+        }
+        .formula {
+            color: #10B981;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Derivative Visualization: f(x) = x²</h1>
+    <p class="subtitle">Watch the secant line converge to the tangent line as h → 0</p>
+    
+    <div class="graph-container">
+        <canvas id="graph" width="800" height="500"></canvas>
+    </div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-line" style="background: #3B82F6;"></div>
+            <span>f(x) = x²</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-line" style="background: #10B981;"></div>
+            <span>Tangent line</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-line" style="background: #F59E0B; border-style: dashed;"></div>
+            <span>Secant line</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #EF4444;"></div>
+            <span>Point (x, f(x))</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: #F59E0B;"></div>
+            <span>Point (x+h, f(x+h))</span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <div class="slider-group">
+            <div class="slider-label">
+                <span class="x-color">Point Position (x)</span>
+                <span id="x-display" class="slider-value x-value-box">1.50</span>
+            </div>
+            <input type="range" id="x-slider" min="0.3" max="2.7" step="0.01" value="1.5">
+            <div class="slider-marks">
+                <span>0.3</span><span>1.0</span><span>1.5</span><span>2.0</span><span>2.7</span>
+            </div>
+        </div>
+        <div class="slider-group">
+            <div class="slider-label">
+                <span class="h-color">Step Size (h)</span>
+                <span id="h-display" class="slider-value h-value-box">1.00</span>
+            </div>
+            <input type="range" id="h-slider" min="0.01" max="2.0" step="0.01" value="1.0">
+            <div class="slider-marks">
+                <span style="color:#10B981">0.01</span><span>0.5</span><span>1.0</span><span>1.5</span><span>2.0</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="info-panel">
+        <div class="info-row">
+            <div class="info-item">
+                <span class="info-label">Tangent slope:</span>
+                <span id="tangent-slope" class="info-value tangent-color">3.0000</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Secant slope:</span>
+                <span id="secant-slope" class="info-value secant-color">4.0000</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Difference |Δ|:</span>
+                <span id="slope-diff" class="info-value diff-color">1.000000</span>
+            </div>
+        </div>
+        <div class="convergence">
+            <span>Convergence: <span id="convergence-pct">75.00%</span></span>
+            <div class="convergence-bar">
+                <div id="convergence-fill" class="convergence-fill" style="width: 75%; background: #F59E0B;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="math-explanation">
+        <strong>Definition:</strong> <span class="formula">f'(x) = lim<sub>h→0</sub> [f(x+h) − f(x)] / h</span><br>
+        <strong>For f(x) = x²:</strong> The derivative is <span class="formula">f'(x) = 2x</span> — the slope of the tangent line at any point.
+    </div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('graph');
+        const ctx = canvas.getContext('2d');
+        
+        // Graph bounds (in math coordinates)
+        const xMin = -0.5, xMax = 4.5;
+        const yMin = -1, yMax = 10;
+        
+        // Padding for axes labels
+        const padding = { left: 50, right: 20, top: 20, bottom: 40 };
+        
+        // Function and derivative
+        const f = x => x * x;
+        const fPrime = x => 2 * x;
+        
+        // Convert math coords to canvas coords
+        function toCanvasX(x) {
+            return padding.left + (x - xMin) / (xMax - xMin) * (canvas.width - padding.left - padding.right);
+        }
+        function toCanvasY(y) {
+            return canvas.height - padding.bottom - (y - yMin) / (yMax - yMin) * (canvas.height - padding.top - padding.bottom);
+        }
+        
+        // Draw grid and axes
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(128,128,128,0.2)';
+            ctx.lineWidth = 1;
+            
+            // Vertical grid lines
+            for (let x = 0; x <= 4; x++) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(x), toCanvasY(yMin));
+                ctx.lineTo(toCanvasX(x), toCanvasY(yMax));
+                ctx.stroke();
+            }
+            
+            // Horizontal grid lines
+            for (let y = 0; y <= 10; y += 2) {
+                ctx.beginPath();
+                ctx.moveTo(toCanvasX(xMin), toCanvasY(y));
+                ctx.lineTo(toCanvasX(xMax), toCanvasY(y));
+                ctx.stroke();
+            }
+            
+            // Axes
+            ctx.strokeStyle = 'rgba(128,128,128,0.6)';
+            ctx.lineWidth = 1.5;
+            
+            // X-axis
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(xMin), toCanvasY(0));
+            ctx.lineTo(toCanvasX(xMax), toCanvasY(0));
+            ctx.stroke();
+            
+            // Y-axis
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(0), toCanvasY(yMin));
+            ctx.lineTo(toCanvasX(0), toCanvasY(yMax));
+            ctx.stroke();
+            
+            // Axis labels
+            ctx.fillStyle = '#9CA3AF';
+            ctx.font = '12px system-ui';
+            ctx.textAlign = 'center';
+            
+            // X-axis labels
+            for (let x = 0; x <= 4; x++) {
+                ctx.fillText(x.toString(), toCanvasX(x), canvas.height - padding.bottom + 20);
+            }
+            
+            // Y-axis labels
+            ctx.textAlign = 'right';
+            for (let y = 0; y <= 10; y += 2) {
+                ctx.fillText(y.toString(), padding.left - 10, toCanvasY(y) + 4);
+            }
+            
+            // Axis titles
+            ctx.fillStyle = '#E5E7EB';
+            ctx.font = '14px system-ui';
+            ctx.textAlign = 'center';
+            ctx.fillText('x', toCanvasX((xMin + xMax) / 2), canvas.height - 5);
+            
+            ctx.save();
+            ctx.translate(15, toCanvasY((yMin + yMax) / 2));
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('y', 0, 0);
+            ctx.restore();
+        }
+        
+        // Draw the main curve f(x) = x²
+        function drawCurve() {
+            ctx.strokeStyle = '#3B82F6';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            
+            let first = true;
+            for (let x = xMin; x <= xMax; x += 0.02) {
+                const y = f(x);
+                if (y >= yMin && y <= yMax) {
+                    if (first) {
+                        ctx.moveTo(toCanvasX(x), toCanvasY(y));
+                        first = false;
+                    } else {
+                        ctx.lineTo(toCanvasX(x), toCanvasY(y));
+                    }
+                }
+            }
+            ctx.stroke();
+        }
+        
+        // Draw a line with clipping
+        function drawLine(x1, y1, x2, y2, color, width, dashed = false) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.setLineDash(dashed ? [8, 4] : []);
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(x1), toCanvasY(y1));
+            ctx.lineTo(toCanvasX(x2), toCanvasY(y2));
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Draw a point
+        function drawPoint(x, y, color, radius, label = null) {
+            const cx = toCanvasX(x);
+            const cy = toCanvasY(y);
+            
+            // White border
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            
+            // Colored center
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            
+            // Label
+            if (label) {
+                ctx.fillStyle = color;
+                ctx.font = 'bold 11px SF Mono, Monaco, monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(label, cx + radius + 5, cy - 5);
+            }
+        }
+        
+        // Draw delta annotations
+        function drawDeltas(px, py, sx2, sy2, h) {
+            // Δx horizontal line
+            ctx.strokeStyle = '#F59E0B';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(px), toCanvasY(py));
+            ctx.lineTo(toCanvasX(sx2), toCanvasY(py));
+            ctx.stroke();
+            
+            // Δy vertical line
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(sx2), toCanvasY(py));
+            ctx.lineTo(toCanvasX(sx2), toCanvasY(sy2));
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Labels
+            ctx.fillStyle = '#F59E0B';
+            ctx.font = '11px SF Mono, Monaco, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Δx = ${h.toFixed(2)}`, toCanvasX((px + sx2) / 2), toCanvasY(py) + 15);
+            
+            ctx.textAlign = 'left';
+            const midY = (py + sy2) / 2;
+            ctx.fillText(`Δy = ${(sy2 - py).toFixed(2)}`, toCanvasX(sx2) + 5, toCanvasY(midY));
+        }
+        
+        // Main draw function
+        function draw(px, h) {
+            // Clear canvas
+            ctx.fillStyle = '#1F2937';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Calculate values
+            const py = f(px);
+            const slope = fPrime(px);
+            const sx2 = px + h;
+            const sy2 = f(sx2);
+            const secantSlope = (sy2 - py) / h;
+            
+            // Draw grid first
+            drawGrid();
+            
+            // Draw the curve
+            drawCurve();
+            
+            // Calculate tangent line endpoints
+            const tangentX1 = px - 1.5;
+            const tangentX2 = px + 1.5;
+            const tangentY1 = py + slope * (tangentX1 - px);
+            const tangentY2 = py + slope * (tangentX2 - px);
+            
+            // Draw tangent line
+            drawLine(tangentX1, tangentY1, tangentX2, tangentY2, '#10B981', 2.5);
+            
+            // Calculate secant line endpoints
+            const secantX1 = px - 0.5;
+            const secantX2 = sx2 + 0.5;
+            const secantY1 = py + secantSlope * (secantX1 - px);
+            const secantY2 = py + secantSlope * (secantX2 - px);
+            
+            // Draw secant line
+            drawLine(secantX1, secantY1, secantX2, secantY2, '#F59E0B', 2, true);
+            
+            // Draw delta annotations
+            drawDeltas(px, py, sx2, sy2, h);
+            
+            // Draw points (on top)
+            drawPoint(px, py, '#EF4444', 7, `(${px.toFixed(2)}, ${py.toFixed(2)})`);
+            drawPoint(sx2, sy2, '#F59E0B', 5);
+            
+            return { slope, secantSlope };
+        }
+        
+        // Get DOM elements
+        const xSlider = document.getElementById('x-slider');
+        const hSlider = document.getElementById('h-slider');
+        const xDisplay = document.getElementById('x-display');
+        const hDisplay = document.getElementById('h-display');
+        const tangentSlopeEl = document.getElementById('tangent-slope');
+        const secantSlopeEl = document.getElementById('secant-slope');
+        const slopeDiffEl = document.getElementById('slope-diff');
+        const convergencePctEl = document.getElementById('convergence-pct');
+        const convergenceFillEl = document.getElementById('convergence-fill');
+        
+        function update() {
+            const px = parseFloat(xSlider.value);
+            const h = parseFloat(hSlider.value);
+            
+            // Update displays
+            xDisplay.textContent = px.toFixed(2);
+            hDisplay.textContent = h.toFixed(2);
+            
+            // Draw and get slopes
+            const { slope, secantSlope } = draw(px, h);
+            
+            // Calculate difference and convergence
+            const diff = Math.abs(secantSlope - slope);
+            const convergence = slope !== 0 ? Math.max(0, (1 - diff / Math.abs(slope)) * 100) : 100;
+            
+            // Update info panel
+            tangentSlopeEl.textContent = slope.toFixed(4);
+            secantSlopeEl.textContent = secantSlope.toFixed(4);
+            slopeDiffEl.textContent = diff.toFixed(6);
+            convergencePctEl.textContent = convergence.toFixed(2) + '%';
+            
+            // Update convergence bar
+            convergenceFillEl.style.width = convergence + '%';
+            if (convergence >= 95) {
+                convergenceFillEl.style.background = '#10B981';
+                convergencePctEl.style.color = '#10B981';
+            } else if (convergence >= 80) {
+                convergenceFillEl.style.background = '#F59E0B';
+                convergencePctEl.style.color = '#F59E0B';
+            } else {
+                convergenceFillEl.style.background = '#EF4444';
+                convergencePctEl.style.color = '#EF4444';
+            }
+        }
+        
+        // Event listeners
+        xSlider.addEventListener('input', update);
+        hSlider.addEventListener('input', update);
+        
+        // Initial draw
+        update();
+    </script>
+</body>
+</html>
