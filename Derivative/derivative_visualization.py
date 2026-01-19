@@ -20,8 +20,8 @@ def f_prime(x):
     return 2 * x
 
 # Set up the figure and axis
-fig, ax = plt.subplots(figsize=(10, 8))
-plt.subplots_adjust(bottom=0.3)  # Make room for sliders
+fig, ax = plt.subplots(figsize=(12, 8))
+plt.subplots_adjust(left=0.08, right=0.75, bottom=0.38, top=0.93)  # Make room for sliders and text
 
 # Plot settings
 x_min, x_max = -1, 4
@@ -76,10 +76,10 @@ main_point, = ax.plot(init_point_x, point_y, 'ro', markersize=12,
 second_point, = ax.plot(secant_x2, secant_y2, 'o', color='orange', markersize=8, 
                          markeredgecolor='white', markeredgewidth=1.5, zorder=5)
 
-# Text annotations
-info_text = ax.text(0.02, 0.98, '', transform=ax.transAxes, fontsize=10,
-                    verticalalignment='top', fontfamily='monospace',
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+# Text annotations (positioned to the right of the plot area)
+info_text = fig.text(0.85, 0.65, '', fontsize=9,
+                     verticalalignment='top', fontfamily='monospace',
+                     bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
 def update_info_text(px, py, slope, h, secant_slope, show_secant):
     text = f'Point:  x = {px:.2f}, f(x) = {py:.2f}\n'
@@ -97,15 +97,15 @@ ax.legend(loc='upper right')
 # --- Sliders ---
 
 # Slider for point x position
-ax_point_x = plt.axes([0.2, 0.18, 0.6, 0.03])
+ax_point_x = plt.axes([0.15, 0.25, 0.55, 0.03])
 slider_point_x = Slider(ax_point_x, 'Point x', 0.2, 3.0, valinit=init_point_x, color='red')
 
 # Slider for h (secant distance)
-ax_h = plt.axes([0.2, 0.12, 0.6, 0.03])
+ax_h = plt.axes([0.15, 0.19, 0.55, 0.03])
 slider_h = Slider(ax_h, 'h (→0 for derivative)', 0.01, 2.0, valinit=init_h, color='orange')
 
 # Checkbox for secant line visibility
-ax_check = plt.axes([0.02, 0.02, 0.15, 0.08])
+ax_check = plt.axes([0.15, 0.10, 0.12, 0.06])
 check_secant = CheckButtons(ax_check, ['Show Secant'], [True])
 
 # Track secant visibility
