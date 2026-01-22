@@ -10,15 +10,15 @@ Run: python derivative_dash.py
 """
 
 import numpy as np
-from dash import Dash, dcc, html, Input, Output, callback
+from dash import Dash, dcc, html, Input, Output
 import plotly.graph_objects as go
 
 # Define function and its derivative
 def f(x):
-    return x ** 2
+    return x ** 3
 
 def f_prime(x):
-    return 2 * x
+    return 3 * x ** 2
 
 # Generate the main curve
 x_curve = np.linspace(-0.5, 4.0, 500)
@@ -28,7 +28,7 @@ y_curve = f(x_curve)
 app = Dash(__name__)
 
 app.layout = html.Div([
-    html.H1("Derivative Visualization: f(x) = x²", 
+    html.H1("Derivative Visualization: f(x) = x³", 
             style={'textAlign': 'center', 'color': '#E5E7EB', 'marginBottom': '5px', 'fontFamily': 'system-ui'}),
     
     html.P("Watch the secant line converge to the tangent line as h → 0",
@@ -96,15 +96,15 @@ app.layout = html.Div([
             " [f(x+h) − f(x)] / h"
         ], style={'color': '#D1D5DB', 'fontSize': '14px'}),
         html.P([
-            html.Strong("For f(x) = x²: ", style={'color': '#3B82F6'}),
-            "f'(x) = 2x (the slope of the tangent line at any point)"
+            html.Strong("For f(x) = x³: ", style={'color': '#3B82F6'}),
+            "f'(x) = 3x² (the slope of the tangent line at any point)"
         ], style={'color': '#D1D5DB', 'fontSize': '14px'}),
     ], style={'textAlign': 'center', 'padding': '10px', 'margin': '10px 40px'})
     
 ], style={'backgroundColor': '#111827', 'minHeight': '100vh', 'padding': '20px'})
 
 
-@callback(
+@app.callback(
     [Output('derivative-graph', 'figure'),
      Output('info-panel', 'children')],
     [Input('x-slider', 'value'),
@@ -130,7 +130,7 @@ def update_graph(px, h):
     fig.add_trace(go.Scatter(
         x=x_curve, y=y_curve,
         mode='lines',
-        name='f(x) = x²',
+        name='f(x) = x³',
         line=dict(color='#3B82F6', width=3),
         hovertemplate='x: %{x:.2f}<br>f(x): %{y:.2f}<extra></extra>'
     ))
@@ -215,14 +215,12 @@ def update_graph(px, h):
             zerolinewidth=1
         ),
         yaxis=dict(
-            range=[-1, 12],
+            range=[-2, 20],
             title='y',
             gridcolor='rgba(128,128,128,0.2)',
             zeroline=True,
             zerolinecolor='rgba(128,128,128,0.5)',
-            zerolinewidth=1,
-            scaleanchor='x',
-            scaleratio=1
+            zerolinewidth=1
         ),
         legend=dict(
             x=0.02, y=0.98,
