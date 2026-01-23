@@ -329,9 +329,9 @@
                 <span class="x-color">Point Position (x)</span>
                 <span id="x-display" class="slider-value x-value-box">0.00</span>
             </div>
-            <input type="range" id="x-slider" min="-2" max="2" step="0.01" value="0">
+            <input type="range" id="x-slider" min="-5" max="5" step="0.01" value="0">
             <div class="slider-marks">
-                <span>-2</span><span>-1</span><span>0</span><span>1</span><span>2</span>
+                <span>-5</span><span>-2.5</span><span>0</span><span>2.5</span><span>5</span>
             </div>
         </div>
         <div class="slider-group">
@@ -339,13 +339,13 @@
                 <span class="h-color">Step Size (h)</span>
                 <span id="h-display" class="slider-value h-value-box">1.00</span>
             </div>
-            <input type="range" id="h-slider" min="-2" max="2" step="0.01" value="1">
+            <input type="range" id="h-slider" min="-5" max="5" step="0.01" value="1">
             <div class="slider-marks">
-                <span style="color:#EC4899">-2</span>
-                <span style="color:#EC4899">-1</span>
+                <span style="color:#EC4899">-5</span>
+                <span style="color:#EC4899">-2.5</span>
                 <span style="color:#6B7280">0</span>
-                <span style="color:#10B981">+1</span>
-                <span style="color:#10B981">+2</span>
+                <span style="color:#10B981">+2.5</span>
+                <span style="color:#10B981">+5</span>
             </div>
             <div id="direction-text" class="direction-indicator" style="text-align:center; color:#10B981;">
                 → Approaching from RIGHT (h &gt; 0)
@@ -429,8 +429,8 @@
         };
         
         // Graph bounds
-        let xMin = -3, xMax = 3;
-        let yMin = -2, yMax = 5;
+        let xMin = -10, xMax = 10;
+        let yMin = -10, yMax = 10;
         
         // Padding
         const padding = { left: 50, right: 20, top: 20, bottom: 40 };
@@ -699,11 +699,11 @@
                 
                 // Adjust bounds for different functions
                 if (currentFunc === 'abs') {
-                    yMin = -1; yMax = 4;
+                    yMin = -10; yMax = 10;
                 } else if (currentFunc === 'cbrt') {
-                    yMin = -2; yMax = 2;
+                    yMin = -10; yMax = 10;
                 } else {
-                    yMin = -2; yMax = 5;
+                    yMin = -10; yMax = 10;
                 }
                 
                 update();
