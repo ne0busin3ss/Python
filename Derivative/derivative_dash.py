@@ -135,25 +135,25 @@ def update_graph(px, h):
         hovertemplate='x: %{x:.2f}<br>f(x): %{y:.2f}<extra></extra>'
     ))
     
-    # Tangent line (green, solid)
+    # Tangent line (orange, solid)
     tangent_x = np.array([px - 1.5, px + 1.5])
     tangent_y = py + slope * (tangent_x - px)
     fig.add_trace(go.Scatter(
         x=tangent_x, y=tangent_y,
         mode='lines',
         name=f'Tangent (slope = {slope:.3f})',
-        line=dict(color='#10B981', width=3, dash='solid'),
+        line=dict(color='#F59E0B', width=3, dash='solid'),
         hoverinfo='skip'
     ))
 
-    # Secant line (orange, dashed)
+    # Secant line (green, dashed)
     secant_x = np.array([px - 0.5, sx2 + 0.5])
     secant_y = py + secant_slope * (secant_x - px)
     fig.add_trace(go.Scatter(
         x=secant_x, y=secant_y,
         mode='lines',
         name=f'Secant (slope = {secant_slope:.3f})',
-        line=dict(color='#F59E0B', width=3, dash='dash'),
+        line=dict(color='#10B981', width=3, dash='dash'),
         hoverinfo='skip'
     ))
     
