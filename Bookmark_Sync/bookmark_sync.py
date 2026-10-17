@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 SYSTEM = platform.system()  # "Linux" | "Darwin" | "Windows"
 HOME = Path.home()
@@ -129,10 +129,11 @@ class Node:
         return self.url is None
 
     def signature(self) -> tuple:
-        """Structure used for equality: titles, URLs, order. Ignores ids/dates."""
+        """Structure used for equality: titles, URLs, order. Ignores ids/dates and
+        leading/trailing spaces in titles (Firefox trims them; Chrome keeps them)."""
         if self.is_folder:
-            return ("F", self.title, tuple(c.signature() for c in self.children))
-        return ("B", self.title, self.url)
+            return ("F", self.title.strip(), tuple(c.signature() for c in self.children))
+        return ("B", self.title.strip(), self.url)
 
 
 Tree = Dict[str, Node]   # root key → folder Node
@@ -149,9 +150,9 @@ def flatten(tree: Tree, roots=ROOTS) -> set:
     def walk(n: Node, path: str):
         for c in n.children:
             if c.is_folder:
-                walk(c, f"{path}/{c.title}")
+                walk(c, f"{path}/{c.title.strip()}")
             elif c.url != SEPARATOR_URL:
-                out.add((path, c.title, c.url))
+                out.add((path, c.title.strip(), c.url))
 
     for r in roots:
         if r in tree:
@@ -585,7 +586,7 @@ class FirefoxDB:
     def insert_children(self, parent_id: int, nodes: List[Node], places: set):
         for pos, n in enumerate(nodes):
             added = n.added_us or now_us()
-            common = {"parent": parent_id, "position": pos, "title": n.title,
+            common = {"parent": parent_id, "position": pos, "title": n.title.strip(),
                       "dateAdded": added, "lastModified": now_us(), "guid": moz_guid(),
                       "syncStatus": FF_SYNC_STATUS_NEW, "syncChangeCounter": 1}
             if n.is_folder:
