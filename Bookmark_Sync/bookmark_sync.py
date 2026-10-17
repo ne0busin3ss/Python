@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 SYSTEM = platform.system()  # "Linux" | "Darwin" | "Windows"
 HOME = Path.home()
@@ -145,15 +145,27 @@ def tree_signature(tree: Tree, roots=ROOTS) -> tuple:
     return tuple(tree[r].signature()[2] if r in tree else () for r in roots)
 
 
+def subfolder_paths(n: Node, path: str) -> List[Tuple[Node, str]]:
+    """(folder, path) for each subfolder. Sibling folders that share a name get
+    " (2)", " (3)"… so their contents aren't merged under one path."""
+    out, seen = [], {}
+    for c in n.children:
+        if c.is_folder:
+            t = c.title.strip()
+            seen[t] = seen.get(t, 0) + 1
+            out.append((c, f"{path}/{t}" if seen[t] == 1 else f"{path}/{t} ({seen[t]})"))
+    return out
+
+
 def flatten(tree: Tree, roots=ROOTS) -> set:
     """Set of (path, title, url) used to describe differences to the user."""
     out = set()
 
     def walk(n: Node, path: str):
+        for c, sub in subfolder_paths(n, path):
+            walk(c, sub)
         for c in n.children:
-            if c.is_folder:
-                walk(c, f"{path}/{c.title.strip()}")
-            elif c.url != SEPARATOR_URL:
+            if not c.is_folder and c.url != SEPARATOR_URL:
                 out.add((path, c.title.strip(), c.url))
 
     for r in roots:
@@ -169,9 +181,8 @@ def folder_contents(tree: Tree, roots=ROOTS) -> Dict[str, list]:
     def walk(n: Node, path: str):
         out[path] = [("F", c.title.strip()) if c.is_folder else ("B", c.title.strip(), c.url)
                      for c in n.children if c.url != SEPARATOR_URL]
-        for c in n.children:
-            if c.is_folder:
-                walk(c, f"{path}/{c.title.strip()}")
+        for c, sub in subfolder_paths(n, path):
+            walk(c, sub)
 
     for r in roots:
         if r in tree:
@@ -198,6 +209,11 @@ def count(tree: Tree, roots=ROOTS) -> Tuple[int, int]:
 
 
 SHOW_ALL = False      # set by --all: list every change instead of a sample
+
+
+def _within(path: str, folder: str) -> bool:
+    """True if `path` is `folder` or inside it ("a/News" is not inside "a/New")."""
+    return path == folder or path.startswith(folder + "/")
 
 
 def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: int = 8):
@@ -242,7 +258,7 @@ def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: i
     explained = {it[0] for it in added | removed} | {o[0] for o, _ in moved + renamed} \
         | {n[0] for _, n in moved + renamed}
     dupes = [p for p in dupes if p not in explained and not any(
-        f.startswith(p + "/") for f in folders_added + folders_removed)]
+        _within(f, p) for f in folders_added + folders_removed)]
 
     extra = []
     if reordered:
@@ -269,9 +285,9 @@ def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: i
     show("~", [f"{o[0]}:  \"{o[1]}\"  →  \"{n[1]}\"" for o, n in renamed])
     show("↕", [f"{p}  (put back in Chrome's order)" for p in reordered])
     show("+", [f"{p}/  (empty folder)" for p in folders_added
-               if not any(it[0].startswith(p) for it in added)])
+               if not any(_within(it[0], p) for it in added)])
     show("-", [f"{p}/  (empty folder)" for p in folders_removed
-               if not any(it[0].startswith(p) for it in removed)])
+               if not any(_within(it[0], p) for it in removed)])
     show("≠", [f"{p}  (has a different number of copies of a bookmark)" for p in dupes])
 
 
@@ -347,6 +363,7 @@ def save_removed(browser: str, current: Tree, master: Tree, opts: "Options") -> 
         return None
     out = opts.backup_dir / "removed" / f"{browser}-removed-{_stamp()}.html"
     n = write_bookmarks_html(only_here, out, f"Removed from {DISPLAY[browser]} {_stamp()}")
+    _prune(out.parent, opts.keep_backups)
     log.info("  %s: %d bookmark(s) only it had were saved to %s", DISPLAY[browser], n, out)
     return out
 
@@ -383,31 +400,31 @@ def _from_chrome_json(d: dict) -> Node:
 def read_chrome_json(path: Path) -> Tuple[Tree, dict]:
     """Returns (tree, raw_document)."""
     doc = json.loads(path.read_text(encoding="utf-8"))
-    roots = doc.get("roots", {})
+    roots = doc.get("roots") if isinstance(doc, dict) else None
+    if not isinstance(roots, dict):
+        raise ValueError("not a Chromium Bookmarks file")
     tree: Tree = {}
     for r, key in CHROME_ROOT_KEYS.items():
         tree[r] = _from_chrome_json(roots[key]) if key in roots else Node(r)
     return tree, doc
 
 
-def _dedupe(children: List[Node]) -> List[Node]:
-    seen, out = set(), []
-    for c in children:
-        s = c.signature()
-        if s not in seen:
-            seen.add(s)
-            out.append(c)
-    return out
+def _not_in(children: List[Node], others: List[Node]) -> List[Node]:
+    """`children` minus items that also appear in `others` (duplicates within
+    `children` itself are kept, as Chrome shows them)."""
+    seen = {c.signature() for c in others}
+    return [c for c in children if c.signature() not in seen]
 
 
 def merge_account_tree(local: Tree, account: Tree) -> Tree:
     """Chrome keeps 'saved to your Google Account' bookmarks in AccountBookmarks.
-    The Chrome UI shows both; the mirror gets account items first, then local,
-    with exact duplicates dropped."""
+    The Chrome UI shows both; the mirror gets account items first, then local
+    items that aren't already in the account copy."""
     merged: Tree = {}
     for r in ROOTS:
         lr, ar = local.get(r, Node(r)), account.get(r, Node(r))
-        merged[r] = Node(lr.title or ar.title, None, _dedupe(ar.children + lr.children), lr.added_us)
+        merged[r] = Node(lr.title or ar.title, None,
+                         ar.children + _not_in(lr.children, ar.children), lr.added_us)
     return merged
 
 
@@ -505,10 +522,17 @@ def chromium_family_running(user_data_dir: Path) -> bool:
         return True
 
 
+def sqlite_uri(path: Path, mode: str) -> str:
+    """file: URI for sqlite3.connect(uri=True); as_uri() escapes '#', '?' and '%'
+    that would otherwise cut the path short. mode=ro/rw never creates the file."""
+    return f"{path.resolve().as_uri()}?mode={mode}"
+
+
 def firefox_locked(places: Path) -> bool:
     """Firefox opens places.sqlite in exclusive locking mode while it runs."""
     try:
-        con = sqlite3.connect(str(places), timeout=0.5, isolation_level=None)
+        con = sqlite3.connect(sqlite_uri(places, "rw"), uri=True,
+                              timeout=0.5, isolation_level=None)
         try:
             con.execute("BEGIN EXCLUSIVE")
             con.execute("ROLLBACK")
@@ -808,13 +832,21 @@ def chromium_family_paths(browser: str, opts: Options) -> Tuple[Optional[Path], 
     return udd, profile
 
 
+class MasterUnavailable(Exception):
+    """Chrome's bookmarks can't be read, so there is nothing to mirror."""
+
+
 def load_master(opts: Options) -> Tuple[Tree, Path]:
     udd, prof = chromium_family_paths("chrome", opts)
     if prof is None or not (prof / "Bookmarks").exists():
-        raise FileNotFoundError(
+        raise MasterUnavailable(
             "Chrome's Bookmarks file was not found. Open Chrome once, or pass "
             "--dir chrome=PATH / --profile chrome=NAME.")
-    tree, _ = read_chrome_json(prof / "Bookmarks")
+    try:
+        tree, _ = read_chrome_json(prof / "Bookmarks")
+    except (OSError, ValueError, KeyError) as e:
+        raise MasterUnavailable(f"Chrome's Bookmarks file could not be read ({e}); "
+                                "nothing was synced") from e
     acct = prof / "AccountBookmarks"
     if opts.include_account and acct.exists():
         try:
@@ -990,6 +1022,7 @@ def watch(targets: List[str], opts: Options, interval: int):
     last_target: Dict[str, tuple] = {}
     pending = set(targets)           # check everything at start-up
     announced = set()                # browsers already reported as open
+    last_error = None                # Chrome problem already reported
     while True:
         try:
             chrome_fp = chrome_fingerprint(opts)
@@ -1011,15 +1044,21 @@ def watch(targets: List[str], opts: Options, interval: int):
                 else:
                     due.append(t)
             if due:
-                for t, r in run_once(due, opts).items():
+                results = run_once(due, opts)
+                if last_error:
+                    log.info("Chrome's bookmarks are readable again")
+                    last_error = None
+                for t, r in results.items():
                     if r in (RESULT_SKIPPED, RESULT_ERROR):
                         pending.add(t)
                     else:
                         pending.discard(t)
                         announced.discard(t)
                     last_target[t] = target_fingerprint(t, opts)   # ignore our own write
-        except FileNotFoundError as e:
-            log.error("%s", e)
+        except MasterUnavailable as e:
+            if str(e) != last_error:     # report once, not every interval
+                log.error("%s", e)
+                last_error = str(e)
         except Exception as e:
             log.exception("Unexpected error: %s", e)
         time.sleep(interval)
@@ -1043,7 +1082,7 @@ def list_browsers(opts: Options):
         else:
             print(f"  {DISPLAY[b]:<9} {'—':<8} not found")
     prof = firefox_profile(opts)
-    if prof:
+    if prof and (prof / "places.sqlite").exists():
         state = "running" if firefox_locked(prof / "places.sqlite") else "closed"
         print(f"  {'Firefox':<9} {state:<8} {prof / 'places.sqlite'}")
     else:
@@ -1069,7 +1108,7 @@ def rescue(source: str, opts: Options) -> int:
             return 1
     try:
         if path.name.endswith(".sqlite"):
-            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            con = sqlite3.connect(sqlite_uri(path, "ro"), uri=True)
             try:
                 tree = FirefoxDB(con).read_tree()
             finally:
@@ -1080,7 +1119,11 @@ def rescue(source: str, opts: Options) -> int:
         log.error("Could not read %s: %s", path, e)
         return 1
 
-    master, _ = load_master(opts)
+    try:
+        master, _ = load_master(opts)
+    except MasterUnavailable as e:
+        log.error("%s", e)
+        return 1
     found = extras(tree, urls_in(master))
     items = sorted(flatten(found, tuple(found)))
     log.info("Checked %s", path)
@@ -1109,6 +1152,13 @@ def _kv(items: List[str], flag: str) -> Dict[str, str]:
     return out
 
 
+def _at_least_1(v: str) -> int:
+    n = int(v)
+    if n < 1:      # 0 would delete the backup taken just before a write
+        raise argparse.ArgumentTypeError("must be 1 or more")
+    return n
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description="Mirror Google Chrome bookmarks into Chromium, Edge, Brave and Firefox.")
@@ -1132,7 +1182,8 @@ def main(argv=None) -> int:
     ap.add_argument("--no-account-bookmarks", action="store_true",
                     help="ignore Chrome's 'saved in Google Account' bookmarks")
     ap.add_argument("--backup-dir", type=Path, default=STATE_DIR / "backups")
-    ap.add_argument("--keep-backups", type=int, default=10)
+    ap.add_argument("--keep-backups", type=_at_least_1, default=10,
+                    help="backups (and removed-bookmark files) kept per browser, 1 or more")
     ap.add_argument("--log-file", type=Path, default=STATE_DIR / "sync.log")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--version", action="version", version=__version__)
@@ -1168,7 +1219,7 @@ def main(argv=None) -> int:
     if a.dry_run:
         log.info("DRY RUN — nothing will be written")
 
-    if a.watch:
+    if a.watch is not None:
         try:
             watch(targets, opts, max(5, a.watch))
         except KeyboardInterrupt:
@@ -1177,7 +1228,7 @@ def main(argv=None) -> int:
 
     try:
         results = run_once(targets, opts)
-    except FileNotFoundError as e:
+    except MasterUnavailable as e:
         log.error("%s", e)
         return 1
     if RESULT_ERROR in results.values():

@@ -31,8 +31,8 @@ Python 3.8+, standard library only. Linux, macOS, Windows.
 * **Backups first:** `~/.bookmark_sync/backups/<browser>/`, newest 10 kept.
 * **Nothing deleted silently:** bookmarks that only a target browser had are saved to
   `~/.bookmark_sync/backups/removed/<browser>-removed-<time>.html` before the sync
-  removes them. Import that file into Chrome (chrome://bookmarks → ⋮ → Import
-  bookmarks) to keep any of them.
+  removes them (newest 10 per browser kept, like backups). Import that file into
+  Chrome (chrome://bookmarks → ⋮ → Import bookmarks) to keep any of them.
 * **Log:** `~/.bookmark_sync/sync.log`.
 
 Dry-run symbols: `+` new from Chrome · `-` removed (only in that browser) ·
@@ -65,7 +65,7 @@ Exit codes: `0` ok · `1` error · `2` a target was skipped because it was runni
 | `--dir firefox=/path/to/profile` | Override auto-detection (Firefox profile dir, or a Chromium-family "User Data" dir). |
 | `--firefox-menu clear` | Empty Firefox's Bookmarks Menu so Firefox is a pure mirror. |
 | `--no-account-bookmarks` | Ignore Chrome's Google-Account bookmarks. |
-| `--keep-backups N`, `--backup-dir PATH`, `--log-file PATH`, `-v` | Housekeeping. |
+| `--keep-backups N`, `--backup-dir PATH`, `--log-file PATH`, `-v` | Housekeeping. `N` must be at least 1. |
 
 Auto-detected locations include native, Snap and Flatpak installs on Linux.
 
