@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 SYSTEM = platform.system()  # "Linux" | "Darwin" | "Windows"
 HOME = Path.home()
@@ -178,16 +178,52 @@ def count(tree: Tree, roots=ROOTS) -> Tuple[int, int]:
     return b, f
 
 
+SHOW_ALL = False      # set by --all: list every change instead of a sample
+
+
 def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: int = 8):
+    """Explain what a sync will change, sorted into four kinds:
+         +  new      in Chrome, not in this browser
+         -  removed  in this browser only — will be deleted
+         >  moved    same title + URL, different folder
+         ~  renamed  same folder + URL, different title"""
     cur, new = flatten(current, roots), flatten(wanted, roots)
-    added, removed = sorted(new - cur), sorted(cur - new)
-    log.info("  %s: +%d added, -%d removed%s", name, len(added), len(removed),
-             "" if added or removed else " (order/folder changes only)")
-    for tag, items in (("+", added), ("-", removed)):
-        for path, title, url in items[:sample]:
-            log.info("      %s %s/%s  <%s>", tag, path, title or "(untitled)", url)
-        if len(items) > sample:
-            log.info("      %s … and %d more", tag, len(items) - sample)
+    added, removed = new - cur, cur - new
+
+    def pair_up(key_of):
+        """Match removed items to added items that share key_of(item)."""
+        pool: Dict[tuple, list] = {}
+        for item in sorted(removed):
+            pool.setdefault(key_of(item), []).append(item)
+        pairs = []
+        for item in sorted(added):
+            olds = pool.get(key_of(item))
+            if olds:
+                pairs.append((olds.pop(0), item))
+        for old, item in pairs:
+            removed.discard(old)
+            added.discard(item)
+        return pairs
+
+    moved = pair_up(lambda it: (it[1], it[2]))      # same title + url
+    renamed = pair_up(lambda it: (it[0], it[2]))    # same folder + url
+
+    log.info("  %s: +%d new, -%d removed, >%d moved, ~%d renamed%s", name,
+             len(added), len(removed), len(moved), len(renamed),
+             "" if added or removed or moved or renamed else " (order changes only)")
+    limit = None if SHOW_ALL else sample
+
+    def show(tag, lines):
+        for line in lines[:limit]:
+            log.info("      %s %s", tag, line)
+        if limit is not None and len(lines) > limit:
+            log.info("      %s … and %d more (add --all to list every change)",
+                     tag, len(lines) - limit)
+
+    show("+", [f"{p}/{t or '(untitled)'}  <{u}>" for p, t, u in sorted(added)])
+    show("-", [f"{p}/{t or '(untitled)'}  <{u}>" for p, t, u in sorted(removed)])
+    show(">", [f"{t}:  {o[0]}  →  {n[0]}" for o, n in moved for t in [n[1] or "(untitled)"]])
+    show("~", [f"{o[0]}:  \"{o[1]}\"  →  \"{n[1]}\"" for o, n in renamed])
 
 
 # --------------------------------------------------------------------------- #
@@ -849,6 +885,8 @@ def main(argv=None) -> int:
     ap.add_argument("--targets", default="chromium,firefox",
                     help="comma list from: chromium, edge, brave, firefox (default: chromium,firefox)")
     ap.add_argument("--dry-run", action="store_true", help="show changes, write nothing")
+    ap.add_argument("--all", action="store_true",
+                    help="list every change (default shows 8 of each kind)")
     ap.add_argument("--watch", type=int, metavar="SECONDS",
                     help="keep running; re-sync when Chrome changes or a skipped browser closes")
     ap.add_argument("--list", action="store_true", help="show detected browsers and exit")
@@ -866,6 +904,8 @@ def main(argv=None) -> int:
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--version", action="version", version=__version__)
     a = ap.parse_args(argv)
+    global SHOW_ALL
+    SHOW_ALL = a.all
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     handlers: List[logging.Handler] = [logging.StreamHandler()]

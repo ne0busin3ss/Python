@@ -29,6 +29,9 @@ Python 3.8+, standard library only. Linux, macOS, Windows.
 * **Backups first:** `~/.bookmark_sync/backups/<browser>/`, newest 10 kept.
 * **Log:** `~/.bookmark_sync/sync.log`.
 
+Dry-run symbols: `+` new from Chrome · `-` removed (only in that browser) ·
+`>` moved to another folder · `~` renamed.
+
 > ⚠️ It's a mirror: anything that exists **only** in Chromium or Firefox will be
 > removed. Run `--dry-run` first and move anything you want to keep into Chrome.
 
@@ -37,7 +40,7 @@ Python 3.8+, standard library only. Linux, macOS, Windows.
 ```bash
 chmod +x bookmark_sync.py
 ./bookmark_sync.py --list        # what was detected, and whether each browser is open
-./bookmark_sync.py --dry-run     # show + / − changes, write nothing
+./bookmark_sync.py --dry-run     # preview changes, write nothing
 ./bookmark_sync.py               # close Chromium + Firefox, then sync
 ```
 
@@ -48,6 +51,7 @@ Exit codes: `0` ok · `1` error · `2` a target was skipped because it was runni
 | Option | Purpose |
 |---|---|
 | `--targets chromium,firefox` | Default. Add `edge`, `brave` as wanted. |
+| `--all` | With `--dry-run`, list every change instead of 8 of each kind. |
 | `--watch 60` | Stay running; re-sync when Chrome changes or a skipped browser closes. |
 | `--profile chrome="Profile 1"` | Non-default Chromium-family profile folder (see `--list`). |
 | `--dir firefox=/path/to/profile` | Override auto-detection (Firefox profile dir, or a Chromium-family "User Data" dir). |
@@ -98,6 +102,9 @@ Trigger: *At log on*.
 * **Favicons** aren't copied; each browser fetches them on the next visit.
 * **Chromium with Google Sync on** (rare) may pull its server copy back over
   the mirror — turn bookmark sync off in Chromium.
+* **Edge signed in with a Microsoft account** may sync its cloud copy of
+  Favorites back over the mirror. Turn off Favorites in
+  `edge://settings/profiles/sync` before adding Edge as a target.
 * **Firefox Sync** is fine: mirrored changes upload as normal edits.
 * Chrome has no separators or keywords, so Firefox-only separators are removed.
 * **Restore a backup:** close the browser and copy the file back —
