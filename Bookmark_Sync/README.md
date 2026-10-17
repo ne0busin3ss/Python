@@ -5,6 +5,8 @@ Edge / Brave) and Firefox are made to match it. Chrome is only ever *read*.
 
 Python 3.8+, standard library only. Linux, macOS, Windows.
 
+📄 **[Command cheat sheet (PDF)](Bookmark_Sync_Cheat_Sheet.pdf)**: service, log, and script commands on two printable pages.
+
 ## How it works
 
 | Chrome folder     | Chromium / Edge / Brave | Firefox                 |
