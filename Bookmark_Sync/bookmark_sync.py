@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-__version__ = "1.3.2"
+__version__ = "1.3.3"
 
 SYSTEM = platform.system()  # "Linux" | "Darwin" | "Windows"
 HOME = Path.home()
@@ -363,7 +363,7 @@ def save_removed(browser: str, current: Tree, master: Tree, opts: "Options") -> 
         return None
     out = opts.backup_dir / "removed" / f"{browser}-removed-{_stamp()}.html"
     n = write_bookmarks_html(only_here, out, f"Removed from {DISPLAY[browser]} {_stamp()}")
-    _prune(out.parent, opts.keep_backups)
+    _prune(out.parent, opts.keep_backups, f"{browser}-removed-*.html")   # per browser
     log.info("  %s: %d bookmark(s) only it had were saved to %s", DISPLAY[browser], n, out)
     return out
 
@@ -553,8 +553,9 @@ def _stamp() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def _prune(folder: Path, keep: int):
-    files = sorted(folder.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
+def _prune(folder: Path, keep: int, pattern: str = "*"):
+    """Keep the newest `keep` files in `folder` matching `pattern`."""
+    files = sorted(folder.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
     for old in files[keep:]:
         try:
             old.unlink()
