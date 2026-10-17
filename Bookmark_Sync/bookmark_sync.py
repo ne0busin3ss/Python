@@ -23,7 +23,8 @@ Safety rules
     * Nothing is written when the target already matches Chrome.
     * --dry-run reports what would change without touching anything.
 
-Requirements: Python 3.8+, standard library only. Linux, macOS and Windows.
+Requirements: Python 3.8+, standard library only. Tested on Linux; the macOS
+and Windows code paths are written but not yet tested.
 """
 from __future__ import annotations
 

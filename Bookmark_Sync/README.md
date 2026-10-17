@@ -3,7 +3,8 @@
 One-way bookmark mirror. **Chrome is the master**; Chromium (and optionally
 Edge / Brave) and Firefox are made to match it. Chrome is only ever *read*.
 
-Python 3.8+, standard library only. Linux, macOS, Windows.
+Python 3.8+, standard library only. **Tested on Linux.** macOS and Windows support is
+written (browser locations, Task Scheduler and launchd setup below) but not yet tested.
 
 📄 **[Command cheat sheet (PDF)](Bookmark_Sync_Cheat_Sheet.pdf)**: service, log, and script commands on two printable pages.
 
