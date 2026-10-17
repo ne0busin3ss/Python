@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 SYSTEM = platform.system()  # "Linux" | "Darwin" | "Windows"
 HOME = Path.home()
@@ -160,6 +160,23 @@ def flatten(tree: Tree, roots=ROOTS) -> set:
     return out
 
 
+def folder_contents(tree: Tree, roots=ROOTS) -> Dict[str, list]:
+    """Folder path → ordered list of what it directly contains."""
+    out: Dict[str, list] = {}
+
+    def walk(n: Node, path: str):
+        out[path] = [("F", c.title.strip()) if c.is_folder else ("B", c.title.strip(), c.url)
+                     for c in n.children if c.url != SEPARATOR_URL]
+        for c in n.children:
+            if c.is_folder:
+                walk(c, f"{path}/{c.title.strip()}")
+
+    for r in roots:
+        if r in tree:
+            walk(tree[r], r)
+    return out
+
+
 def count(tree: Tree, roots=ROOTS) -> Tuple[int, int]:
     b = f = 0
 
@@ -186,7 +203,8 @@ def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: i
          +  new      in Chrome, not in this browser
          -  removed  in this browser only — will be deleted
          >  moved    same title + URL, different folder
-         ~  renamed  same folder + URL, different title"""
+         ~  renamed  same folder + URL, different title
+       plus folder-level changes: ↕ reordered, empty folders, ≠ duplicate copies"""
     cur, new = flatten(current, roots), flatten(wanted, roots)
     added, removed = new - cur, cur - new
 
@@ -208,9 +226,32 @@ def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: i
     moved = pair_up(lambda it: (it[1], it[2]))      # same title + url
     renamed = pair_up(lambda it: (it[0], it[2]))    # same folder + url
 
+    # Folder-level differences that the bookmark comparison above can't see:
+    # reordering, empty folders, duplicate copies of the same bookmark.
+    cur_f, new_f = folder_contents(current, roots), folder_contents(wanted, roots)
+    folders_added = sorted(p for p in new_f if p not in cur_f)
+    folders_removed = sorted(p for p in cur_f if p not in new_f)
+    reordered, dupes = [], []
+    for p in sorted(set(cur_f) & set(new_f)):
+        a, b = cur_f[p], new_f[p]
+        if a != b:
+            (reordered if sorted(a) == sorted(b) else dupes).append(p)
+    # A folder whose contents changed for an already-listed reason isn't "reordered".
+    explained = {it[0] for it in added | removed} | {o[0] for o, _ in moved + renamed} \
+        | {n[0] for _, n in moved + renamed}
+    dupes = [p for p in dupes if p not in explained and not any(
+        f.startswith(p + "/") for f in folders_added + folders_removed)]
+
+    extra = []
+    if reordered:
+        extra.append(f"↕{len(reordered)} folder(s) reordered")
+    if folders_added or folders_removed:
+        extra.append(f"folders +{len(folders_added)} -{len(folders_removed)}")
+    if dupes:
+        extra.append(f"≠{len(dupes)} with duplicate copies")
     log.info("  %s: +%d new, -%d removed, >%d moved, ~%d renamed%s", name,
              len(added), len(removed), len(moved), len(renamed),
-             "" if added or removed or moved or renamed else " (order changes only)")
+             (", " + ", ".join(extra)) if extra else "")
     limit = None if SHOW_ALL else sample
 
     def show(tag, lines):
@@ -224,6 +265,12 @@ def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: i
     show("-", [f"{p}/{t or '(untitled)'}  <{u}>" for p, t, u in sorted(removed)])
     show(">", [f"{t}:  {o[0]}  →  {n[0]}" for o, n in moved for t in [n[1] or "(untitled)"]])
     show("~", [f"{o[0]}:  \"{o[1]}\"  →  \"{n[1]}\"" for o, n in renamed])
+    show("↕", [f"{p}  (put back in Chrome's order)" for p in reordered])
+    show("+", [f"{p}/  (empty folder)" for p in folders_added
+               if not any(it[0].startswith(p) for it in added)])
+    show("-", [f"{p}/  (empty folder)" for p in folders_removed
+               if not any(it[0].startswith(p) for it in removed)])
+    show("≠", [f"{p}  (has a different number of copies of a bookmark)" for p in dupes])
 
 
 # --------------------------------------------------------------------------- #
@@ -893,28 +940,82 @@ def run_once(targets: List[str], opts: Options) -> Dict[str, str]:
     return results
 
 
-def chrome_fingerprint(opts: Options) -> tuple:
-    _, prof = chromium_family_paths("chrome", opts)
+def _files_fingerprint(files: List[Path]) -> tuple:
     fp = []
-    for name in ("Bookmarks", "AccountBookmarks"):
-        p = prof / name if prof else None
-        if p and p.exists():
+    for p in files:
+        try:
             st = p.stat()
-            fp.append((name, st.st_mtime_ns, st.st_size))
+            fp.append((p.name, st.st_mtime_ns, st.st_size))
+        except OSError:
+            pass
     return tuple(fp)
 
 
+def chrome_fingerprint(opts: Options) -> tuple:
+    _, prof = chromium_family_paths("chrome", opts)
+    return _files_fingerprint([prof / "Bookmarks", prof / "AccountBookmarks"] if prof else [])
+
+
+def target_fingerprint(target: str, opts: Options) -> tuple:
+    """Changes whenever the browser itself rewrites its bookmarks."""
+    if target == "firefox":
+        prof = firefox_profile(opts)
+        return _files_fingerprint([prof / "places.sqlite", prof / "places.sqlite-wal"]
+                                  if prof else [])
+    _, prof = chromium_family_paths(target, opts)
+    return _files_fingerprint([prof / "Bookmarks"] if prof else [])
+
+
+def target_running(target: str, opts: Options) -> bool:
+    try:
+        if target == "firefox":
+            prof = firefox_profile(opts)
+            places = prof / "places.sqlite" if prof else None
+            return bool(places and places.exists() and firefox_locked(places))
+        udd, _ = chromium_family_paths(target, opts)
+        return bool(udd and chromium_family_running(udd))
+    except Exception:
+        return False                 # let the sync itself report the problem
+
+
 def watch(targets: List[str], opts: Options, interval: int):
-    log.info("Watching Chrome bookmarks every %ds (Ctrl+C to stop)", interval)
-    last_fp, pending = None, set(targets)
+    """Re-sync a browser when Chrome's bookmarks change, or when that browser
+    rewrites its own bookmarks (e.g. its own cloud sync reshuffled them).
+    A browser that is open is noted once and synced as soon as it closes."""
+    log.info("Watching every %ds: Chrome → %s (Ctrl+C to stop)",
+             interval, ", ".join(DISPLAY[t] for t in targets))
+    last_chrome = None
+    last_target: Dict[str, tuple] = {}
+    pending = set(targets)           # check everything at start-up
+    announced = set()                # browsers already reported as open
     while True:
         try:
-            fp = chrome_fingerprint(opts)
-            if fp != last_fp or pending:
-                todo = targets if fp != last_fp else sorted(pending)
-                results = run_once(todo, opts)
-                pending = {t for t, r in results.items() if r in (RESULT_SKIPPED, RESULT_ERROR)}
-                last_fp = fp
+            chrome_fp = chrome_fingerprint(opts)
+            if chrome_fp != last_chrome:
+                pending |= set(targets)
+                last_chrome = chrome_fp
+            for t in targets:
+                fp = target_fingerprint(t, opts)
+                if t in last_target and fp != last_target[t]:
+                    pending.add(t)
+                last_target[t] = fp
+
+            due = []
+            for t in sorted(pending):
+                if target_running(t, opts):
+                    if t not in announced:
+                        log.info("%s is open — will check it when it closes", DISPLAY[t])
+                        announced.add(t)
+                else:
+                    due.append(t)
+            if due:
+                for t, r in run_once(due, opts).items():
+                    if r in (RESULT_SKIPPED, RESULT_ERROR):
+                        pending.add(t)
+                    else:
+                        pending.discard(t)
+                        announced.discard(t)
+                    last_target[t] = target_fingerprint(t, opts)   # ignore our own write
         except FileNotFoundError as e:
             log.error("%s", e)
         except Exception as e:

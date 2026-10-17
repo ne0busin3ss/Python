@@ -34,7 +34,8 @@ Python 3.8+, standard library only. Linux, macOS, Windows.
 * **Log:** `~/.bookmark_sync/sync.log`.
 
 Dry-run symbols: `+` new from Chrome · `-` removed (only in that browser) ·
-`>` moved to another folder · `~` renamed.
+`>` moved to another folder · `~` renamed · `↕` folder put back in Chrome's order ·
+`≠` folder has a different number of copies of a bookmark.
 
 > ⚠️ It's a mirror: anything that exists **only** in Chromium or Firefox will be
 > removed. Run `--dry-run` first and move anything you want to keep into Chrome.
@@ -57,7 +58,7 @@ Exit codes: `0` ok · `1` error · `2` a target was skipped because it was runni
 | `--targets chromium,firefox` | Default. Add `edge`, `brave` as wanted. |
 | `--rescue edge` | From that browser's newest backup, save every bookmark Chrome doesn't have to `~/rescued-bookmarks-*.html`, ready to import into Chrome. Also accepts a file path. |
 | `--all` | With `--dry-run`, list every change instead of 8 of each kind. |
-| `--watch 60` | Stay running; re-sync when Chrome changes or a skipped browser closes. |
+| `--watch 60` | Stay running. Re-checks a browser when Chrome's bookmarks change, when that browser rewrites its own bookmarks, or when an open browser closes. An open browser is reported once, not every minute. |
 | `--profile chrome="Profile 1"` | Non-default Chromium-family profile folder (see `--list`). |
 | `--dir firefox=/path/to/profile` | Override auto-detection (Firefox profile dir, or a Chromium-family "User Data" dir). |
 | `--firefox-menu clear` | Empty Firefox's Bookmarks Menu so Firefox is a pure mirror. |
