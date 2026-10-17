@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 SYSTEM = platform.system()  # "Linux" | "Darwin" | "Windows"
 HOME = Path.home()
@@ -140,7 +140,9 @@ Tree = Dict[str, Node]   # root key → folder Node
 
 
 def tree_signature(tree: Tree, roots=ROOTS) -> tuple:
-    return tuple(tree[r].signature() if r in tree else ("F", r, ()) for r in roots)
+    """Contents of each top-level folder. The top-level folders' own names are
+    left out: each browser names them itself (Edge: "Favorites bar")."""
+    return tuple(tree[r].signature()[2] if r in tree else () for r in roots)
 
 
 def flatten(tree: Tree, roots=ROOTS) -> set:
