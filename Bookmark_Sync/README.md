@@ -27,6 +27,10 @@ Python 3.8+, standard library only. Linux, macOS, Windows.
 * **Never writes to a running browser** (it would overwrite the file on exit).
   Running targets are reported and retried in `--watch` mode once they close.
 * **Backups first:** `~/.bookmark_sync/backups/<browser>/`, newest 10 kept.
+* **Nothing deleted silently:** bookmarks that only a target browser had are saved to
+  `~/.bookmark_sync/backups/removed/<browser>-removed-<time>.html` before the sync
+  removes them. Import that file into Chrome (chrome://bookmarks → ⋮ → Import
+  bookmarks) to keep any of them.
 * **Log:** `~/.bookmark_sync/sync.log`.
 
 Dry-run symbols: `+` new from Chrome · `-` removed (only in that browser) ·
@@ -51,6 +55,7 @@ Exit codes: `0` ok · `1` error · `2` a target was skipped because it was runni
 | Option | Purpose |
 |---|---|
 | `--targets chromium,firefox` | Default. Add `edge`, `brave` as wanted. |
+| `--rescue edge` | From that browser's newest backup, save every bookmark Chrome doesn't have to `~/rescued-bookmarks-*.html`, ready to import into Chrome. Also accepts a file path. |
 | `--all` | With `--dry-run`, list every change instead of 8 of each kind. |
 | `--watch 60` | Stay running; re-sync when Chrome changes or a skipped browser closes. |
 | `--profile chrome="Profile 1"` | Non-default Chromium-family profile folder (see `--list`). |

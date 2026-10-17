@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 SYSTEM = platform.system()  # "Linux" | "Darwin" | "Windows"
 HOME = Path.home()
@@ -224,6 +224,82 @@ def describe_diff(name: str, current: Tree, wanted: Tree, roots=ROOTS, sample: i
     show("-", [f"{p}/{t or '(untitled)'}  <{u}>" for p, t, u in sorted(removed)])
     show(">", [f"{t}:  {o[0]}  →  {n[0]}" for o, n in moved for t in [n[1] or "(untitled)"]])
     show("~", [f"{o[0]}:  \"{o[1]}\"  →  \"{n[1]}\"" for o, n in renamed])
+
+
+# --------------------------------------------------------------------------- #
+#  Saving bookmarks that only a target has (importable HTML)                  #
+# --------------------------------------------------------------------------- #
+
+ROOT_LABELS = {"toolbar": "Bookmarks bar", "other": "Other bookmarks",
+               "mobile": "Mobile bookmarks", "menu": "Bookmarks menu"}
+
+
+def urls_in(tree: Tree) -> set:
+    return {u for _, _, u in flatten(tree, tuple(tree))}
+
+
+def extras(tree: Tree, known_urls: set) -> Tree:
+    """Copy of `tree` keeping only bookmarks whose URL is not in known_urls
+    (with the folders that lead to them)."""
+    def prune(n: Node) -> Node:
+        kids = []
+        for c in n.children:
+            if c.is_folder:
+                p = prune(c)
+                if p.children:
+                    kids.append(p)
+            elif c.url != SEPARATOR_URL and c.url not in known_urls:
+                kids.append(c)
+        return Node(n.title, None, kids, n.added_us)
+    return {r: prune(n) for r, n in tree.items()}
+
+
+def write_bookmarks_html(tree: Tree, out: Path, heading: str) -> int:
+    """Write the standard bookmarks.html format that every browser can import
+    (Chrome: Bookmark manager ⋮ → Import bookmarks). Returns bookmarks written."""
+    from html import escape
+    lines = ["<!DOCTYPE NETSCAPE-Bookmark-file-1>",
+             '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">',
+             "<TITLE>Bookmarks</TITLE>", "<H1>Bookmarks</H1>", "<DL><p>",
+             f"    <DT><H3>{escape(heading)}</H3>", "    <DL><p>"]
+    written = 0
+
+    def emit(n: Node, depth: int):
+        nonlocal written
+        pad = "    " * depth
+        for c in n.children:
+            if c.is_folder:
+                lines.append(f"{pad}<DT><H3>{escape(c.title)}</H3>")
+                lines.append(f"{pad}<DL><p>")
+                emit(c, depth + 1)
+                lines.append(f"{pad}</DL><p>")
+            else:
+                added = (c.added_us or now_us()) // 1_000_000
+                lines.append(f'{pad}<DT><A HREF="{escape(c.url)}" ADD_DATE="{added}">'
+                             f"{escape(c.title or c.url)}</A>")
+                written += 1
+
+    for r, n in tree.items():
+        if n.children:
+            lines += [f"        <DT><H3>{escape(ROOT_LABELS.get(r, r))}</H3>", "        <DL><p>"]
+            emit(n, 3)
+            lines.append("        </DL><p>")
+    lines += ["    </DL><p>", "</DL><p>", ""]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines), encoding="utf-8")
+    return written
+
+
+def save_removed(browser: str, current: Tree, master: Tree, opts: "Options") -> Optional[Path]:
+    """Before a sync deletes bookmarks that exist only in `browser`, save them
+    to an importable HTML file so nothing is lost by accident."""
+    only_here = extras(current, urls_in(master))
+    if not any(n.children for n in only_here.values()):
+        return None
+    out = opts.backup_dir / "removed" / f"{browser}-removed-{_stamp()}.html"
+    n = write_bookmarks_html(only_here, out, f"Removed from {DISPLAY[browser]} {_stamp()}")
+    log.info("  %s: %d bookmark(s) only it had were saved to %s", DISPLAY[browser], n, out)
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -728,6 +804,7 @@ def sync_chromium_family(browser: str, master: Tree, opts: Options) -> str:
     bak = backup_file(target, opts.backup_dir, browser, opts.keep_backups)
     if bak:
         log.debug("%s: backup → %s", name, bak)
+    save_removed(browser, current, master, opts)
     doc = build_chrome_document(master, current_doc)
     tmp = target.with_name("Bookmarks.sync-tmp")
     tmp.write_text(json.dumps(doc, indent=3, ensure_ascii=False), encoding="utf-8")
@@ -774,6 +851,7 @@ def sync_firefox(master: Tree, opts: Options) -> str:
         con.close()
         bak = backup_sqlite(places, opts.backup_dir, "firefox", opts.keep_backups)
         log.debug("Firefox: backup → %s", bak)
+        save_removed("firefox", {r: current[r] for r in roots}, wanted, opts)
 
         con = sqlite3.connect(str(places), timeout=2, isolation_level=None)
         db = FirefoxDB(con)
@@ -869,6 +947,55 @@ def list_browsers(opts: Options):
         print(f"  {'Firefox':<9} {'—':<8} not found")
 
 
+def rescue(source: str, opts: Options) -> int:
+    """Find bookmarks in a backup (or any bookmarks file) whose URL is not in
+    Chrome, and save them to an HTML file that can be imported into Chrome."""
+    if source in DISPLAY and source != "chrome":
+        folder = opts.backup_dir / source
+        files = sorted((p for p in folder.glob("*") if p.is_file()),
+                       key=lambda p: p.name, reverse=True) if folder.exists() else []
+        if not files:
+            log.error("No %s backups found in %s", DISPLAY[source], folder)
+            return 1
+        path, label = files[0], DISPLAY[source]
+    else:
+        path = Path(source).expanduser()
+        label = path.name
+        if not path.exists():
+            log.error("File not found: %s", path)
+            return 1
+    try:
+        if path.name.endswith(".sqlite"):
+            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            try:
+                tree = FirefoxDB(con).read_tree()
+            finally:
+                con.close()
+        else:
+            tree, _ = read_chrome_json(path)
+    except (ValueError, KeyError, sqlite3.Error) as e:
+        log.error("Could not read %s: %s", path, e)
+        return 1
+
+    master, _ = load_master(opts)
+    found = extras(tree, urls_in(master))
+    items = sorted(flatten(found, tuple(found)))
+    log.info("Checked %s", path)
+    if not items:
+        log.info("Nothing to rescue: every bookmark in it is already in Chrome.")
+        return 0
+    out = HOME / f"rescued-bookmarks-{source if source in DISPLAY else 'file'}-{_stamp()}.html"
+    write_bookmarks_html(found, out, f"Rescued from {label} {datetime.now():%Y-%m-%d}")
+    log.info("%d bookmark(s) are not in Chrome:", len(items))
+    for p, t, u in items:
+        log.info("  • %s/%s", p, t or u)
+    log.info("\nSaved to %s", out)
+    log.info("To add them to Chrome: open chrome://bookmarks → ⋮ (top right) → "
+             "Import bookmarks → choose that file.\nThey arrive in a folder under "
+             "Other bookmarks; drag the ones you want where they belong and delete the rest.")
+    return 0
+
+
 def _kv(items: List[str], flag: str) -> Dict[str, str]:
     out = {}
     for it in items or []:
@@ -885,6 +1012,9 @@ def main(argv=None) -> int:
     ap.add_argument("--targets", default="chromium,firefox",
                     help="comma list from: chromium, edge, brave, firefox (default: chromium,firefox)")
     ap.add_argument("--dry-run", action="store_true", help="show changes, write nothing")
+    ap.add_argument("--rescue", metavar="SOURCE",
+                    help="save bookmarks that are not in Chrome from a browser's newest backup "
+                         "(e.g. edge) or a bookmarks file, as HTML you can import into Chrome")
     ap.add_argument("--all", action="store_true",
                     help="list every change (default shows 8 of each kind)")
     ap.add_argument("--watch", type=int, metavar="SECONDS",
@@ -925,6 +1055,8 @@ def main(argv=None) -> int:
     if a.list:
         list_browsers(opts)
         return 0
+    if a.rescue:
+        return rescue(a.rescue, opts)
 
     targets = [t.strip().lower() for t in a.targets.split(",") if t.strip()]
     bad = [t for t in targets if t not in DISPLAY or t == "chrome"]
