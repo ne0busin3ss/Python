@@ -1,7 +1,8 @@
-# bookmark_sync — Chrome → Chromium + Firefox mirror
+# bookmark_sync — Chrome → Chromium, Edge and Firefox mirror
 
-One-way bookmark mirror. **Chrome is the master**; Chromium (and optionally
-Edge / Brave) and Firefox are made to match it. Chrome is only ever *read*.
+One-way bookmark mirror. **Chrome is the master**; Chromium, Microsoft Edge and
+Firefox (and optionally Brave) are made to match it. Chrome is only ever *read*.
+Browsers that aren't installed are simply skipped.
 
 Python 3.8+, standard library only. **Tested on Linux.** macOS and Windows support is
 written (browser locations, Task Scheduler and launchd setup below) but not yet tested.
@@ -52,6 +53,13 @@ chmod +x bookmark_sync.py
 ./bookmark_sync.py               # close Chromium + Firefox, then sync
 ```
 
+With Edge as well, name all three targets:
+
+```bash
+./bookmark_sync.py --targets chromium,edge,firefox --dry-run
+./bookmark_sync.py --targets chromium,edge,firefox
+```
+
 Exit codes: `0` ok · `1` error · `2` a target was skipped because it was running.
 
 ## Options
@@ -70,6 +78,40 @@ Exit codes: `0` ok · `1` error · `2` a target was skipped because it was runni
 
 Auto-detected locations include native, Snap and Flatpak installs on Linux.
 
+## Adding Microsoft Edge on Linux
+
+Use Microsoft's own RPM or DEB package rather than a Flatpak or Snap: it keeps
+its bookmarks in `~/.config/microsoft-edge`, where the script looks, and the
+script's "is it open?" check is untested with sandboxed browsers.
+
+**Fedora / RHEL:**
+
+```bash
+sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+sudo tee /etc/yum.repos.d/microsoft-edge.repo <<'REPO'
+[microsoft-edge]
+name=Microsoft Edge
+baseurl=https://packages.microsoft.com/yumrepos/edge
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+REPO
+sudo dnf install microsoft-edge-stable
+```
+
+**Ubuntu / Debian:** download the `.deb` from microsoft.com/edge and install it;
+it adds Microsoft's repository for updates.
+
+Then:
+
+1. **Open Edge once and close it.** Its bookmark folder exists only after the first launch.
+2. **Turn off Favorites sync** at `edge://settings/profiles/sync` if you sign in with a
+   Microsoft account, so its cloud copy doesn't compete with Chrome.
+3. **Add `edge` to `--targets`** (the service example below already includes it), then
+   `systemctl --user restart bookmark-sync`. Edge receives Chrome's bookmarks within a
+   minute of closing. If Edge already had favorites of its own, run `--dry-run` first:
+   anything only Edge has is removed (after being saved to an importable file).
+
 ## Run it automatically
 
 ### Linux — systemd user service (recommended)
@@ -77,10 +119,10 @@ Auto-detected locations include native, Snap and Flatpak installs on Linux.
 `~/.config/systemd/user/bookmark-sync.service`
 ```ini
 [Unit]
-Description=Mirror Chrome bookmarks to Chromium and Firefox
+Description=Mirror Chrome bookmarks to Chromium, Edge and Firefox
 
 [Service]
-ExecStart=/usr/bin/python3 %h/bin/bookmark_sync.py --watch 60
+ExecStart=/usr/bin/python3 %h/bin/bookmark_sync.py --targets chromium,edge,firefox --watch 60
 Restart=on-failure
 RestartSec=30
 
@@ -94,8 +136,10 @@ systemctl --user enable --now bookmark-sync.service
 journalctl --user -u bookmark-sync -f      # watch it work
 ```
 
+No Edge? Drop `edge,` from `--targets`, or leave it: a missing browser is just reported as not found.
+
 Prefer a timer over a long-running watcher? Use cron instead:
-`*/15 * * * * /usr/bin/python3 $HOME/bin/bookmark_sync.py >/dev/null 2>&1`
+`*/15 * * * * /usr/bin/python3 $HOME/bin/bookmark_sync.py --targets chromium,edge,firefox >/dev/null 2>&1`
 
 ### Windows — Task Scheduler
 Action: `pythonw.exe` · Arguments: `C:\Tools\bookmark_sync.py --watch 60` ·
